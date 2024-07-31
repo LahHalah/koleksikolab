@@ -69,10 +69,7 @@
 	"RAR 0.1v.safetensors": "https://civitai.com/api/download/models/670384?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
     },
     "previous_default_models": [
-        "juggernautXL_version8Rundiffusion.safetensors",
-        "juggernautXL_version7Rundiffusion.safetensors",
-        "juggernautXL_v7Rundiffusion.safetensors",
-        "juggernautXL_version6Rundiffusion.safetensors",
-        "juggernautXL_v6Rundiffusion.safetensors"
+        "dreamshaperXL_v21TurboDPMSDE.safetensors",
+        "ponyDiffusionV6XL_v6TurboDPOMerge.safetensors",
     ]
 }

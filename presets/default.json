@@ -74,8 +74,9 @@
 	"BulbaComicPony.safetensors": "https://civitai.com/api/download/models/576518?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
 	"BanashiPony.safetensors": "https://civitai.com/api/download/models/410686?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
 	"WasurePony.safetensors": "https://civitai.com/api/download/models/435427?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
-	"ChokusenPony.safetensors": "https://civitai.com/api/download/models/459491?type=Model&format=SafeTensor&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
-	"EregaAnimePony.safetensors": "https://civitai.com/api/download/models/461648?type=Model&format=SafeTensor&format=SafeTensor&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"ChokusenPony.safetensors": "https://civitai.com/api/download/models/459491?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"EregaAnimePony.safetensors": "https://civitai.com/api/download/models/461648?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"longnippls-vp2-000012.safetensors": "https://civitai.com/api/download/models/472796?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
     },
     "previous_default_models": [
         "dreamshaperXL_v21TurboDPMSDE.safetensors",

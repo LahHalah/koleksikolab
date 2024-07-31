@@ -67,6 +67,15 @@
 	"MythAnim3Style.safetensors": "https://civitai.com/api/download/models/681784?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
 	"MythAnim3Style.safetensors": "https://civitai.com/api/download/models/681784?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
 	"RAR 0.1v.safetensors": "https://civitai.com/api/download/models/670384?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"EnpitAnimePony.safetensors": "https://civitai.com/api/download/models/640954?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"MikuAnimePony.safetensors": "https://civitai.com/api/download/models/679352?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"WatashiHentaiPony.safetensors": "https://civitai.com/api/download/models/610199?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"WatashiAnimePony.safetensors": "https://civitai.com/api/download/models/599119?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"BulbaComicPony.safetensors": "https://civitai.com/api/download/models/576518?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"BanashiPony.safetensors": "https://civitai.com/api/download/models/410686?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"WasurePony.safetensors": "https://civitai.com/api/download/models/435427?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"ChokusenPony.safetensors": "https://civitai.com/api/download/models/459491?type=Model&format=SafeTensor&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"EregaAnimePony.safetensors": "https://civitai.com/api/download/models/461648?type=Model&format=SafeTensor&format=SafeTensor&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
     },
     "previous_default_models": [
         "dreamshaperXL_v21TurboDPMSDE.safetensors",

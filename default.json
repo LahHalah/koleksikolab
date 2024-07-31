@@ -1,0 +1,78 @@
+{
+    "default_model": "dreamshaperXL_v21TurboDPMSDE.safetensors",
+    "default_refiner": "None",
+    "default_refiner_switch": 0.5,
+    "default_loras": [
+        [
+            true,
+            "sd_xl_offset_example-lora_1.0.safetensors",
+            0.1
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ]
+    ],
+    "default_cfg_scale": 2.0,
+    "default_sample_sharpness": 3.0,
+    "default_sampler": "dpmpp_2m_sde_gpu",
+    "default_scheduler": "karras",
+    "default_performance": "Speed",
+    "default_prompt": "",
+    "default_prompt_negative": "",
+    "default_styles": [
+        "Fooocus V2",
+        "Fooocus Enhance",
+        "Fooocus Sharp"
+    ],
+    "default_aspect_ratio": "1152*896",
+    "default_overwrite_step": -1,
+    "checkpoint_downloads": {
+        "dreamshaperXL_v21TurboDPMSDE.safetensors": "https://civitai.com/api/download/models/351306?token=860c6877b0a4c464f93625ec8b707250"
+	"ponyDiffusionV6XL_v6TurboDPOMerge.safetensors": "https://civitai.com/api/download/models/298112?token=860c6877b0a4c464f93625ec8b707250"
+    },
+    "embeddings_downloads": {
+	"unaestheticXL_bp5.safetensors": "https://civitai.com/api/download/models/480651?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"zPDXL2.safetensors": "https://civitai.com/api/download/models/509253?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"zPDXL2-neg.safetensors": "https://civitai.com/api/download/models/509253?type=Negative&format=Other&token=860c6877b0a4c464f93625ec8b707250"
+},
+    "lora_downloads": {
+        "sd_xl_offset_example-lora_1.0.safetensors": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_offset_example-lora_1.0.safetensors"
+	"Anime Summer Days 2 Style SDXL_LoRA_Pony Diffusion V6 XL.safetensors": "https://civitai.com/api/download/models/372898?token=860c6877b0a4c464f93625ec8b707250"
+	"Counterfeit-V3.0 Style SDXL_LoRA_Pony Diffusion V6 XL.safetensors": "https://civitai.com/api/download/models/372089??token=860c6877b0a4c464f93625ec8b707250"
+	"Pastel-Mix Style SDXL_LoRA_Pony Diffusion V6 XL.safetensors": "hhttps://civitai.com/api/download/models/372104?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"MatureMaleMix v1.4 Style LoRA_Pony XL v6.safetensors": "https://civitai.com/api/download/models/432606?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"CatalystStylePDXL.safetensors": "https://civitai.com/api/download/models/575354?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"RealisticAnime.safetensors": "https://civitai.com/api/download/models/420176?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"CandyCuteStylePDXL.safetensors": "https://civitai.com/api/download/models/569206?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"Citron3D_PDXL.safetensors": "https://civitai.com/api/download/models/510415?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"Vivid.safetensors": "https://civitai.com/api/download/models/471606?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"CitronAnimeTreasure-07.safetensors": "https://civitai.com/api/download/models/420102?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"MythAnim3Style.safetensors": "https://civitai.com/api/download/models/681784?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"MythAnim3Style.safetensors": "https://civitai.com/api/download/models/681784?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+	"RAR 0.1v.safetensors": "https://civitai.com/api/download/models/670384?type=Model&format=SafeTensor&token=860c6877b0a4c464f93625ec8b707250"
+    },
+    "previous_default_models": [
+        "juggernautXL_version8Rundiffusion.safetensors",
+        "juggernautXL_version7Rundiffusion.safetensors",
+        "juggernautXL_v7Rundiffusion.safetensors",
+        "juggernautXL_version6Rundiffusion.safetensors",
+        "juggernautXL_v6Rundiffusion.safetensors"
+    ]
+}

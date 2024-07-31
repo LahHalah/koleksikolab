@@ -1,0 +1,91 @@
+{
+    "default_model": "ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
+    "default_refiner": "None",
+    "default_refiner_switch": 0.5,
+    "default_loras": [
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ]
+    ],
+    "default_cfg_scale": 7.0,
+    "default_sample_sharpness": 2.0,
+    "default_sampler": "dpmpp_2m_sde_gpu",
+    "default_scheduler": "karras",
+    "default_performance": "Speed",
+    "default_prompt": "",
+    "default_prompt_negative": "",
+    "default_styles": [
+        "Fooocus V2",
+        "Fooocus Enhance",
+        "Fooocus Sharp"
+    ],
+    "default_aspect_ratio": "1152*896",
+    "default_overwrite_step": -1,
+    "checkpoint_downloads": {
+        "ponyDiffusionV6XL_v6StartWithThisOne.safetensors": "https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL/resolve/main/ponyDiffusionV6XL_v6StartWithThisOne.safetensors",
+        "dreamshaperXL_v21TurboDPMSDE.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/cekpoint/dreamshaperXL_v21TurboDPMSDE.safetensors"
+    },
+    "embeddings_downloads": {
+      "unaestheticXL_Alb2.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/embedding/unaestheticXL_Alb2.safetensors",
+      "unaestheticXL_bp5.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/embedding/unaestheticXL_bp5.safetensors",
+      "zPDXL2-neg.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/embedding/zPDXL2-neg.safetensors",
+      "zPDXL2.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/embedding/zPDXL2.safetensors"
+    },
+    "lora_downloads": {
+        "sd_xl_offset_example-lora_1.0.safetensors": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_offset_example-lora_1.0.safetensors",
+        "Anal_Goatse-000009.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Anal_Goatse-000009.safetensors",
+        "Anal_fisting.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Anal_fisting.safetensors",
+        "Anal_fisting_and_Stretching_1.0.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Anal_fisting_and_Stretching_1.0.safetensors",
+        "BanashiPony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/BanashiPony.safetensors",
+        "BulbaComicPony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/BulbaComicPony.safetensors",
+        "CandyCuteStylePDXL": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/CandyCuteStylePDXL.safetensors",
+        "CatalystStylePDXL.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/CatalystStylePDXL.safetensors",
+        "ChokusenPony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/ChokusenPony.safetensors",
+        "Citron3D_PDXL.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Citron3D_PDXL.safetensors",
+        "CitronAnimeTreasure-07.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/CitronAnimeTreasure-07.safetensors",
+        "Concept_Nipple_penetration.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Concept_Nipple_penetration.safetensors",
+        "Counterfeit-V3.0_SDXL_pony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Counterfeit-V3.0_SDXL_pony.safetensors",
+        "EnpitAnimePony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/EnpitAnimePony.safetensors",
+        "EregaAnimePony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/EregaAnimePony.safetensors",
+        "MatureMaleMix-v1.4.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/MatureMaleMix-v1.4.safetensors",
+        "MikuAnimePony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/MikuAnimePony.safetensors",
+        "MythAnim3Style.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/MythAnim3Style.safetensors",
+        "Nipple_Milking__Lactation.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Nipple_Milking__Lactation.safetensors",
+        "Nipple_Toolbox_Pony_V2-000003.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Nipple_Toolbox_Pony_V2-000003.safetensors",
+        "Pastel-Mix.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Pastel-Mix.safetensors",
+        "RAR_0.1v.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/RAR_0.1v.safetensors",
+        "RealisticAnime.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/RealisticAnime.safetensors",
+        "Vivid.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/Vivid.safetensors",
+        "WasurePony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/WasurePony.safetensors",
+        "WatashiAnimePony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/WatashiAnimePony.safetensors",
+        "WatashiHentaiPony.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/WatashiHentaiPony.safetensors",
+        "longnippls-vp2-000012.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/longnippls-vp2-000012.safetensors",
+        "multi_prolapse_ponyXL_v1": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora/multi_prolapse_ponyXL_v1.safetensors"
+    },
+    "previous_default_models": [
+        "ponyDiffusionV6XL_v6TurboDPOMerge.safetensors",
+        "dreamshaperXL_v21TurboDPMSDE.safetensors"
+    ]
+}

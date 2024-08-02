@@ -1,0 +1,60 @@
+{
+    "default_model": "dreamshaperXL_v21TurboDPMSDE.safetensors",
+    "default_refiner": "None",
+    "default_refiner_switch": 0.5,
+    "default_loras": [
+        [
+            true,
+            "none",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ],
+        [
+            true,
+            "None",
+            1.0
+        ]
+    ],
+    "default_cfg_scale": 4.0,
+    "default_sample_sharpness": 2.0,
+    "default_sampler": "dpmpp_2m_sde_gpu",
+    "default_scheduler": "karras",
+    "default_performance": "Speed",
+    "default_prompt": "",
+    "default_prompt_negative": "(embedding:unaestheticXL_bp5), (embedding:unaestheticXL_Alb2)",
+    "default_styles": [
+        "Fooocus V2",
+        "Fooocus Enhance",
+        "Fooocus Sharp"
+    ],
+    "default_aspect_ratio": "1152*896",
+    "default_overwrite_step": -1,
+    "checkpoint_downloads": {
+        "dreamshaperXL_v21TurboDPMSDE.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/cekpoint/dreamshaperXL_v21TurboDPMSDE.safetensors"
+    },
+    "embeddings_downloads": {
+        "unaestheticXL_bp5.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/embedding/unaestheticXL_bp5.safetensors",
+        "unaestheticXL_Alb2.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/embedding/unaestheticXL_Alb2.safetensors"
+    },
+    "lora_downloads": {
+        "add-detail-xl.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora_xl/add-detail-xl.safetensors",
+        "chest_adjust.safetensors": "https://huggingface.co/Lahhhalah/fuokus/resolve/main/lora_xl/chest_adjust.safetensors"
+    },
+    "previous_default_models": [
+        "dreamshaperXL_v21TurboDPMSDE.safetensors"
+    ]
+}

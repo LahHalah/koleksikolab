@@ -399,4 +399,4 @@ with gr.Blocks() as demo:
 
 # Luncurkan aplikasi Gradio
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(debug=True, inline=False)

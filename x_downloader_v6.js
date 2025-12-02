@@ -1,516 +1,264 @@
 // ==UserScript==
-// @name         X Video Downloader - DOM Mode (Firefox Android)
+// @name         X Video Downloader v8 - Anti-Stuck & Protected Fix
 // @namespace    http://tampermonkey.net/
-// @version      6.1
-// @description  Download video X/Twitter termasuk dari akun terkunci - DOM Direct Access
+// @version      8.0
+// @description  Download video X/Twitter (Support Akun Terkunci) - Metode Deep React Search
 // @author       Assistant
 // @match        https://x.com/*
 // @match        https://twitter.com/*
 // @match        https://mobile.x.com/*
 // @match        https://mobile.twitter.com/*
 // @icon         https://abs.twimg.com/favicons/twitter.ico
-// @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
-// @connect      api.vxtwitter.com
-// @connect      video.twimg.com
-// @connect      *
+// @grant        GM_setClipboard
 // @run-at       document-idle
 // ==/UserScript==
 
 (function() {
     'use strict';
 
-    // ... (CSS tetap sama) ...
-
-    // ========== TOAST ==========
-    function toast(msg, isError = false) {
-        let t = document.querySelector('.xvd-toast');
-        if (!t) {
-            t = document.createElement('div');
-            t.className = 'xvd-toast';
-            document.body.appendChild(t);
+    GM_addStyle(`
+        .xvd-fab {
+            position: fixed; bottom: 90px; right: 20px; z-index: 99999;
+            background: #1d9bf0; color: white; width: 60px; height: 60px;
+            border-radius: 50%; border: none; font-size: 28px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
         }
-        t.textContent = msg;
-        t.classList.toggle('err', isError);
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 2500);
+        .xvd-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9); z-index: 100000;
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column; color: white;
+        }
+        .xvd-box {
+            background: #000; padding: 20px; border-radius: 15px;
+            border: 1px solid #333; width: 90%; max-width: 400px;
+            text-align: center;
+        }
+        .xvd-btn {
+            display: block; width: 100%; padding: 15px; margin: 10px 0;
+            border-radius: 30px; font-weight: bold; text-decoration: none;
+            border: none; cursor: pointer; font-size: 16px;
+        }
+        .xvd-btn-down { background: #00ba7c; color: white; }
+        .xvd-btn-tab { background: #1d9bf0; color: white; }
+        .xvd-btn-close { background: #333; color: #ddd; margin-top: 20px; }
+        .xvd-loader {
+            border: 4px solid #333; border-top: 4px solid #fff;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 0.8s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .xvd-log { font-size: 12px; color: #777; margin-top: 10px; font-family: monospace; }
+    `);
+
+    // =========================================================================
+    // 🧠 CORE: REACT DEEP SEARCH (ALGORITMA PENCARI VIDEO)
+    // =========================================================================
+
+    function getReactFiber(el) {
+        const key = Object.keys(el).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternalInstance'));
+        return key ? el[key] : null;
     }
 
-    // ========== COPY ==========
-    function copyText(text) {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.cssText = 'position:fixed;opacity:0';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        try {
-            document.execCommand('copy');
-            toast('✓ URL disalin ke clipboard!');
-        } catch (e) {
-            toast('Gagal menyalin', true);
-        }
-        document.body.removeChild(ta);
-    }
+    // Fungsi rekursif untuk mencari objek "variants" (daftar video) di dalam tumpukan data React
+    function searchForVariants(obj, depth = 0, maxDepth = 8) {
+        if (!obj || depth > maxDepth) return null;
+        if (typeof obj !== 'object') return null;
 
-    // ========== EXTRACT TWEET ID ==========
-    function getTweetId(url) {
-        const m = url.match(/status\/(\d+)/);
-        return m ? m[1] : null;
-    }
+        // Cek apakah ini objek varian video
+        if (Array.isArray(obj) && obj.length > 0) {
+            if (obj[0].content_type === 'video/mp4' || (obj[0].url && obj[0].bitrate !== undefined)) {
+                return obj;
+            }
+        }
 
-    // ========== GET VIDEO FROM DOM (IMPROVED) ==========
-    function getVideoFromDOM() {
-        console.log('🔍 Mencari video di DOM (Enhanced Mode)...');
-        
-        const results = [];
-        
-        // METODE 1: Cari semua video element
-        const videos = document.querySelectorAll('video');
-        console.log(`Found ${videos.length} video elements`);
-        
-        for (const vid of videos) {
-            let videoUrl = null;
-            let thumb = vid.poster || '';
-            
-            // Priority 1: currentSrc (video yang sedang dimuat)
-            if (vid.currentSrc && vid.currentSrc.includes('video.twimg.com')) {
-                videoUrl = vid.currentSrc;
-            }
-            // Priority 2: src langsung
-            else if (vid.src && vid.src.includes('video.twimg.com')) {
-                videoUrl = vid.src;
-            }
-            // Priority 3: source element
-            else if (!videoUrl) {
-                const source = vid.querySelector('source');
-                if (source && source.src && source.src.includes('video.twimg.com')) {
-                    videoUrl = source.src;
-                }
-            }
-            // Priority 4: Blob URL (akun terkunci sering pakai ini)
-            else if (vid.src && vid.src.startsWith('blob:')) {
-                // Coba ambil dari event/playback
-                try {
-                    if (vid.readyState >= 2) { // HAVE_CURRENT_DATA atau lebih
-                        // Untuk blob, kita perlu menunggu video dimuat sepenuhnya
-                        videoUrl = vid.src;
-                    }
-                } catch (e) {
-                    console.log('Blob video belum siap');
-                }
-            }
-            
-            if (videoUrl) {
-                console.log('✓ Video ditemukan:', videoUrl.substring(0, 100) + '...');
-                results.push({
-                    url: videoUrl,
-                    thumb: thumb,
-                    element: vid,
-                    isBlob: videoUrl.startsWith('blob:'),
-                    quality: 'unknown'
-                });
+        // Cek properti umum tempat video bersembunyi
+        const targets = ['variants', 'video_info', 'mediaDetails', 'media', 'extended_entities'];
+        for (const t of targets) {
+            if (obj[t]) {
+                const found = searchForVariants(obj[t], depth + 1, maxDepth);
+                if (found) return found;
             }
         }
-        
-        // METODE 2: Cari di Twitter's media container (untuk akun terkunci)
-        if (results.length === 0) {
-            console.log('🔍 Mencari di media containers...');
-            
-            // Cari semua container media
-            const mediaContainers = document.querySelectorAll('div[data-testid="videoPlayer"], div[data-testid="videoComponent"], div[role="presentation"]');
-            
-            for (const container of mediaContainers) {
-                // Coba cari video di dalamnya
-                const vid = container.querySelector('video');
-                if (vid) {
-                    const videoUrl = vid.src || vid.currentSrc;
-                    if (videoUrl && (videoUrl.includes('video.twimg.com') || videoUrl.startsWith('blob:'))) {
-                        results.push({
-                            url: videoUrl,
-                            thumb: vid.poster || '',
-                            element: vid,
-                            isBlob: videoUrl.startsWith('blob:'),
-                            quality: 'unknown'
-                        });
-                        break;
-                    }
-                }
-                
-                // Cari URL video di data attributes
-                const dataUrl = container.getAttribute('data-video-url') || 
-                               container.getAttribute('data-src') ||
-                               container.querySelector('a[href*="video.twimg.com"]')?.href;
-                
-                if (dataUrl && dataUrl.includes('video.twimg.com')) {
-                    results.push({
-                        url: dataUrl,
-                        thumb: '',
-                        element: null,
-                        isBlob: false,
-                        quality: 'HD'
-                    });
-                    break;
-                }
-            }
-        }
-        
-        // METODE 3: Cari di tweet container untuk akun terkunci
-        if (results.length === 0) {
-            console.log('🔍 Mencari di tweet containers...');
-            
-            const articles = document.querySelectorAll('article');
-            for (const article of articles) {
-                // Cari semua link yang kemungkinan video
-                const links = article.querySelectorAll('a[href*="video.twimg.com"]');
-                for (const link of links) {
-                    if (link.href.includes('.mp4') || link.href.includes('.m3u8')) {
-                        results.push({
-                            url: link.href,
-                            thumb: '',
-                            element: null,
-                            isBlob: false,
-                            quality: 'HD'
-                        });
-                        break;
-                    }
-                }
-                
-                // Cari data attributes yang berisi video URL
-                const tweetDiv = article.closest('div[data-testid="tweet"]');
-                if (tweetDiv) {
-                    const tweetText = tweetDiv.innerText || tweetDiv.textContent;
-                    const videoMatch = tweetText.match(/https:\/\/video\.twimg\.com\/[^\s]+/);
-                    if (videoMatch) {
-                        results.push({
-                            url: videoMatch[0],
-                            thumb: '',
-                            element: null,
-                            isBlob: false,
-                            quality: 'HD'
-                        });
-                    }
-                }
-            }
-        }
-        
-        // METODE 4: Untuk Blob URL, coba force video load
-        if (results.length === 0) {
-            const blobVideos = Array.from(document.querySelectorAll('video')).filter(v => v.src.startsWith('blob:'));
-            if (blobVideos.length > 0) {
-                console.log('🎯 Mencoba memuat blob video...');
-                const vid = blobVideos[0];
-                
-                // Coba play video sebentar untuk memastikan blob terisi
-                try {
-                    if (vid.paused) {
-                        vid.play().catch(e => console.log('Auto-play diblokir:', e));
-                        await new Promise(resolve => setTimeout(resolve, 300));
-                        vid.pause();
-                    }
-                    
-                    if (vid.readyState >= 2) {
-                        results.push({
-                            url: vid.src,
-                            thumb: vid.poster || '',
-                            element: vid,
-                            isBlob: true,
-                            quality: 'unknown'
-                        });
-                    }
-                } catch (e) {
-                    console.log('Gagal memuat blob video:', e);
-                }
-            }
-        }
-        
-        return results.length > 0 ? results : null;
-    }
 
-    // ========== FETCH VIDEO VIA API (FALLBACK) ==========
-    function fetchVideoAPI(tweetUrl) {
-        return new Promise((resolve, reject) => {
-            const id = getTweetId(tweetUrl);
-            if (!id) return reject('URL tidak valid');
-
-            console.log('📡 Mencoba API untuk tweet:', id);
-
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: `https://api.vxtwitter.com/Twitter/status/${id}`,
-                timeout: 15000,
-                onload: (r) => {
-                    try {
-                        const d = JSON.parse(r.responseText);
-                        if (d.media_extended) {
-                            const vids = d.media_extended
-                                .filter(m => m.type === 'video' || m.type === 'gif')
-                                .map(v => ({
-                                    url: v.url,
-                                    thumb: v.thumbnail_url || '',
-                                    type: v.type,
-                                    quality: 'HD'
-                                }));
-                            if (vids.length) {
-                                console.log('✓ API berhasil');
-                                return resolve({
-                                    videos: vids,
-                                    user: d.user_name || 'user',
-                                    id: id,
-                                    mode: 'api'
-                                });
-                            }
-                        }
-                        reject('API: Tweet tidak mengandung video');
-                    } catch (e) {
-                        reject('API: Gagal memproses data');
-                    }
-                },
-                onerror: () => reject('API: Koneksi gagal'),
-                ontimeout: () => reject('API: Request timeout')
-            });
-        });
-    }
-
-    // ========== HANDLE BLOB VIDEO ==========
-    function blobToDataURL(blobUrl) {
-        return new Promise((resolve, reject) => {
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: blobUrl,
-                responseType: 'blob',
-                onload: (response) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(response.response);
-                },
-                onerror: reject
-            });
-        });
-    }
-
-    // ========== GET DIRECT VIDEO URL (Khusus untuk akun terkunci) ==========
-    function extractProtectedVideoURL() {
-        console.log('🛡️ Mencari URL video protected...');
-        
-        // Metode 1: Cari di semua script yang berisi video URL
-        const scripts = document.querySelectorAll('script');
-        for (const script of scripts) {
-            const content = script.textContent || script.innerText;
-            if (content.includes('video.twimg.com')) {
-                const matches = content.match(/https:\/\/video\.twimg\.com\/[^"'\s]+\.(mp4|m3u8)/g);
-                if (matches && matches.length > 0) {
-                    return matches[0];
-                }
-            }
+        // Jika tidak ketemu, coba cari di children tertentu (tapi batasi agar tidak hang)
+        if (obj.props && obj.props.children) {
+             // Hindari traverse terlalu dalam ke children UI, kita cari data props saja
         }
-        
-        // Metode 2: Cari di video player yang mungkin disembunyikan
-        const hiddenVideos = document.querySelectorAll('video[style*="display: none"], video[hidden]');
-        for (const vid of hiddenVideos) {
-            if (vid.src && vid.src.includes('video.twimg.com')) {
-                return vid.src;
-            }
-        }
-        
-        // Metode 3: Coba ambil dari network data yang disimpan di memori
-        try {
-            const performanceEntries = performance.getEntriesByType('resource');
-            const videoEntries = performanceEntries.filter(entry => 
-                entry.name.includes('video.twimg.com') && 
-                (entry.name.endsWith('.mp4') || entry.name.includes('.m3u8'))
-            );
-            
-            if (videoEntries.length > 0) {
-                return videoEntries[videoEntries.length - 1].name;
-            }
-        } catch (e) {
-            console.log('Tidak bisa akses performance API');
-        }
-        
+
         return null;
     }
 
-    // ========== MODAL (sama seperti sebelumnya, dengan sedikit perbaikan) ==========
-    let backdrop = null;
+    // Fungsi utama ekstraktor
+    async function extractVideoData(startElement) {
+        let fiber = getReactFiber(startElement);
+        if (!fiber) return null;
 
-    function getModal() {
-        if (backdrop) return backdrop;
+        let attempts = 0;
+        // Naik ke atas (traverse up) untuk mencari komponen induk (Tweet/Article) yang memegang data
+        while (fiber && attempts < 15) {
+            const memoized = fiber.memoizedProps;
+            const state = fiber.memoizedState;
 
-        backdrop = document.createElement('div');
-        backdrop.className = 'xvd-backdrop';
-        backdrop.innerHTML = `
-            <div class="xvd-box">
-                <div class="xvd-head">
-                    <span class="xvd-head-title">🔥 Download Video</span>
-                    <button class="xvd-head-close">✕</button>
-                </div>
-                <div class="xvd-body"></div>
-            </div>
-        `;
+            // 1. Cek di Props langsung
+            let variants = searchForVariants(memoized);
+            if (variants) return variants;
 
-        backdrop.querySelector('.xvd-head-close').onclick = closeModal;
-        backdrop.addEventListener('click', (e) => {
-            if (e.target === backdrop) closeModal();
-        });
+            // 2. Cek di State
+            variants = searchForVariants(state);
+            if (variants) return variants;
 
-        document.body.appendChild(backdrop);
-        return backdrop;
-    }
+            // 3. Cek Legacy Tweet Data (biasanya ada di properti 'tweet')
+            if (memoized && memoized.tweet) {
+                variants = searchForVariants(memoized.tweet);
+                if (variants) return variants;
+            }
 
-    function openModal() {
-        getModal().classList.add('show');
-    }
-
-    function closeModal() {
-        if (backdrop) backdrop.classList.remove('show');
-    }
-
-    function setBody(html) {
-        const body = getModal().querySelector('.xvd-body');
-        if (body) body.innerHTML = html;
-    }
-
-    function showLoading(msg = 'Mengambil video...') {
-        setBody(`
-            <div class="xvd-spin"></div>
-            <div class="xvd-loading-text">${msg}</div>
-        `);
-    }
-
-    function showError(msg) {
-        setBody(`
-            <div class="xvd-error">
-                <div class="xvd-error-icon">😕</div>
-                <div class="xvd-error-msg">Gagal Mendeteksi Video</div>
-                <div class="xvd-error-detail">${msg}</div>
-            </div>
-            <div class="xvd-steps">
-                <div class="xvd-steps-title">💡 Tips untuk Akun Terkunci:</div>
-                <div class="xvd-step">
-                    <span class="xvd-step-num">1</span>
-                    <span><strong>Tunggu video selesai dimuat sepenuhnya</strong></span>
-                </div>
-                <div class="xvd-step">
-                    <span class="xvd-step-num">2</span>
-                    <span><strong>Putar video sampai selesai minimal 1x</strong></span>
-                </div>
-                <div class="xvd-step">
-                    <span class="xvd-step-num">3</span>
-                    <span><strong>Scroll sedikit ke atas/bawah lalu coba lagi</strong></span>
-                </div>
-                <div class="xvd-step">
-                    <span class="xvd-step-num">4</span>
-                    <span><strong>Buka tweet di tab baru (tekam tahan link tweet)</strong></span>
-                </div>
-            </div>
-        `);
-    }
-
-    function showResult(data) {
-        const v = data.videos[0];
-        const id = data.id || Date.now().toString();
-        const user = data.user || 'protected';
-        const mode = data.mode || 'dom';
-        const filename = `${user}_${id}.mp4`;
-        
-        const isBlob = v.url && v.url.startsWith('blob:');
-        const isProtected = mode === 'dom';
-
-        let instructionHTML = '';
-        let infoBannerHTML = '';
-
-        if (isProtected) {
-            instructionHTML = `
-                <div class="xvd-instruction warning">
-                    <div class="xvd-instruction-icon">⚠️</div>
-                    <div class="xvd-instruction-main">AKUN TERKUNCI / PROTECTED DETECTED</div>
-                    <div class="xvd-instruction-sub">Gunakan metode manual di bawah</div>
-                </div>
-            `;
-            
-            infoBannerHTML = `
-                <div class="xvd-info-banner warning">
-                    <div class="xvd-info-title warning">📌 Cara Download Akun Terkunci:</div>
-                    <div class="xvd-info-text">
-                        <strong>METODE 1 (Rekomendasi):</strong><br>
-                        1. Buka video di tab baru<br>
-                        2. Putar video sampai selesai<br>
-                        3. Tekan tahan video → "Save video"<br><br>
-                        <strong>METODE 2 (Alternatif):</strong><br>
-                        1. Salin URL di bawah<br>
-                        2. Tempel di browser lain<br>
-                        3. Download manual
-                    </div>
-                </div>
-            `;
-        } else {
-            instructionHTML = `
-                <div class="xvd-instruction">
-                    <div class="xvd-instruction-icon">👇</div>
-                    <div class="xvd-instruction-main">TEKAN TAHAN TOMBOL HIJAU</div>
-                    <div class="xvd-instruction-sub">Lalu pilih "Download link" atau "Simpan tautan"</div>
-                </div>
-            `;
+            fiber = fiber.return;
+            attempts++;
         }
+        return null;
+    }
 
-        // Untuk blob URL, kita tidak bisa memberikan download langsung
-        const downloadButtonHTML = isBlob ? `
-            <a href="${v.url}" 
-               class="xvd-download-link" 
-               target="_blank" 
-               rel="noopener noreferrer">
-                🔄 BUKA BLOB DI TAB BARU
-            </a>
-            <div class="xvd-info-banner">
-                <div class="xvd-info-title">⚠️ Blob Video Detected:</div>
-                <div class="xvd-info-text">
-                    Video menggunakan format blob. Buka di tab baru, 
-                    lalu tekan tahan pada video untuk save manual.
+    function getBestQuality(variants) {
+        if (!variants) return null;
+        // Filter hanya MP4, lalu urutkan bitrate terbesar
+        const mp4s = variants.filter(v => v.content_type === 'video/mp4');
+        if (!mp4s.length) return null;
+        mp4s.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+        return mp4s[0].url;
+    }
+
+    // =========================================================================
+    // 🎨 UI & HANDLERS
+    // =========================================================================
+
+    function showOverlay(msg = '') {
+        removeOverlay();
+        const div = document.createElement('div');
+        div.className = 'xvd-overlay';
+        div.innerHTML = `
+            <div class="xvd-box">
+                <div id="xvd-status">
+                    <div class="xvd-loader"></div>
+                    <p>${msg || 'Sedang mencari sumber video...'}</p>
                 </div>
             </div>
-        ` : `
-            <a href="${v.url}" 
-               class="xvd-download-link" 
-               download="${filename}"
-               type="video/mp4">
-                💾 DOWNLOAD SEKARANG
-            </a>
+        `;
+        document.body.appendChild(div);
+        return div;
+    }
+
+    function removeOverlay() {
+        const el = document.querySelector('.xvd-overlay');
+        if (el) el.remove();
+    }
+
+    function showSuccess(url) {
+        const box = document.querySelector('.xvd-box');
+        if (!box) return;
+
+        const filename = `twitter_${Date.now()}.mp4`;
+
+        box.innerHTML = `
+            <h2 style="margin:0 0 15px 0">Video Ditemukan! ✅</h2>
+            <video src="${url}" style="width:100%; max-height:200px; border-radius:10px; background:#222; margin-bottom:15px" controls></video>
+            
+            <a href="${url}" download="${filename}" class="xvd-btn xvd-btn-down">⬇️ DOWNLOAD VIDEO</a>
+            <button id="xvd-newtab" class="xvd-btn xvd-btn-tab">↗️ BUKA DI TAB BARU</button>
+            <button class="xvd-btn xvd-btn-close">Tutup</button>
+            
+            <div class="xvd-log">Untuk akun terkunci: Gunakan "Buka di Tab Baru" lalu tekan tahan video -> Save Video</div>
         `;
 
-        // Video preview
-        const videoPreviewHTML = v.url ? `
-            <div class="xvd-vid-container">
-                <video class="xvd-vid" 
-                       src="${v.url}" 
-                       controls 
-                       playsinline
-                       ${v.thumb ? `poster="${v.thumb}"` : ''}
-                       preload="metadata">
-                       Your browser does not support the video tag.
-                </video>
-            </div>
-        ` : '';
+        document.getElementById('xvd-newtab').onclick = () => window.open(url, '_blank');
+        box.querySelector('.xvd-btn-close').onclick = removeOverlay;
+    }
 
-        setBody(`
-            ${instructionHTML}
+    function showFail(msg) {
+        const box = document.querySelector('.xvd-box');
+        if (!box) return;
+        box.innerHTML = `
+            <h2 style="color:#ef4444">Gagal ❌</h2>
+            <p>${msg}</p>
+            <button class="xvd-btn xvd-btn-close">Tutup</button>
+        `;
+        box.querySelector('.xvd-btn-close').onclick = removeOverlay;
+    }
 
-            ${infoBannerHTML}
+    // =========================================================================
+    // 🚀 EXECUTOR
+    // =========================================================================
 
-            <div class="xvd-btn-row">
-                <button class="xvd-btn-sec xvd-btn-primary" id="xvd-newtab-btn">📱 Buka di Tab Baru</button>
-                <button class="xvd-btn-sec" id="xvd-copy-btn">📋 Salin URL</button>
-            </div>
+    async function startProcess(element) {
+        showOverlay('Menganalisis data video (Metode Deep Search)...');
+        
+        // Timeout Safety: Paksa berhenti jika > 5 detik
+        const timeout = setTimeout(() => {
+            showFail('Waktu habis! <br>Twitter mungkin mengubah strukturnya atau koneksi lambat.<br><br>Coba refresh halaman.');
+        }, 5000);
 
-            ${downloadButtonHTML}
+        try {
+            // 1. Cari varian
+            const variants = await extractVideoData(element);
+            
+            clearTimeout(timeout); // Batalkan timeout jika selesai
 
-            ${videoPreviewHTML}
+            // 2. Proses hasil
+            if (variants) {
+                const bestUrl = getBestQuality(variants);
+                if (bestUrl) {
+                    showSuccess(bestUrl);
+                } else {
+                    showFail('URL Video MP4 tidak ditemukan dalam data.');
+                }
+            } else {
+                showFail('Gagal mengekstrak data tweet.<br>Pastikan video sudah dimuat di layar.');
+            }
 
-            <div class="xvd-info-banner">
-                <div class="xvd-info-title">Mode Deteksi: <span class="xvd-mode-badge ${mode}">${mode.toUpperCase()}</span></div>
-                <div class="xvd-info-text">
-                    ${isProtected ? 
-                        'Video diambil langsung dari halaman. Twitter membatasi akses ke akun terkunci.' : 
-                        'Video diambil via API publik.'
-                 
+        } catch (e) {
+            clearTimeout(timeout);
+            console.error(e);
+            showFail('Error Script: ' + e.message);
+        }
+    }
+
+    // =========================================================================
+    // 🛠️ INIT
+    // =========================================================================
+
+    function createFAB() {
+        if (document.querySelector('.xvd-fab')) return;
+        const fab = document.createElement('button');
+        fab.className = 'xvd-fab';
+        fab.innerHTML = '⚡';
+        fab.onclick = () => {
+            // Cari video yang paling kelihatan di layar (viewport)
+            const videos = Array.from(document.querySelectorAll('video'));
+            const target = videos.find(v => {
+                const r = v.getBoundingClientRect();
+                return r.top >= 0 && r.top < window.innerHeight;
+            }) || videos[0];
+
+            if (target) {
+                startProcess(target);
+            } else {
+                alert('Tidak ada video yang terlihat di layar!');
+            }
+        };
+        document.body.appendChild(fab);
+    }
+
+    // Jalankan
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', createFAB);
+    } else {
+        createFAB();
+    }
+    
+    // Backup interval kalau-kalau navigasi SPA menghapus tombol
+    setInterval(createFAB, 2000);
+
+})();

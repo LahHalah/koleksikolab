@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         X/Twitter Video Downloader Mobile
+// @name         X/Twitter Video Downloader Mobile Fixed
 // @namespace    http://tampermonkey.net/
-// @version      2.0
-// @description  Download videos from X.com with mobile-friendly interface
+// @version      3.0
+// @description  Download videos from X.com - Mobile Friendly & Working!
 // @author       Assistant
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -10,20 +10,16 @@
 // @match        https://mobile.twitter.com/*
 // @icon         https://abs.twimg.com/favicons/twitter.ico
 // @grant        GM_xmlhttpRequest
-// @grant        GM_download
 // @grant        GM_addStyle
-// @connect      twitter.com
-// @connect      x.com
-// @connect      twimg.com
-// @connect      video.twimg.com
-// @connect      api.twitter.com
-// @connect      api.x.com
 // @connect      *
 // @run-at       document-idle
 // ==/UserScript==
 
 (function() {
     'use strict';
+
+    // ==================== DETECT MOBILE ====================
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     // ==================== STYLES ====================
     GM_addStyle(`
@@ -37,59 +33,36 @@
             color: white;
             border: none;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            font-size: 22px;
+            width: 56px;
+            height: 56px;
+            font-size: 24px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 4px 15px rgba(29, 155, 240, 0.4);
+            box-shadow: 0 4px 15px rgba(29, 155, 240, 0.5);
             transition: all 0.3s ease;
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
 
-        .xvd-download-btn:hover,
         .xvd-download-btn:active {
-            transform: scale(1.1);
-            background: linear-gradient(135deg, #0d8bd9 0%, #0a7bc4 100%);
-            box-shadow: 0 6px 20px rgba(29, 155, 240, 0.6);
-        }
-
-        .xvd-download-btn.loading {
-            pointer-events: none;
-            opacity: 0.7;
-        }
-
-        .xvd-download-btn.loading::after {
-            content: '';
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border: 3px solid transparent;
-            border-top-color: white;
-            border-radius: 50%;
-            animation: xvd-spin 1s linear infinite;
-        }
-
-        @keyframes xvd-spin {
-            to { transform: rotate(360deg); }
+            transform: scale(0.95);
         }
 
         /* Floating Action Button */
         .xvd-fab {
             position: fixed;
-            bottom: 80px;
+            bottom: 90px;
             right: 20px;
             z-index: 99999;
             background: linear-gradient(135deg, #1d9bf0 0%, #0d8bd9 100%);
             color: white;
             border: none;
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            font-size: 26px;
+            width: 64px;
+            height: 64px;
+            font-size: 28px;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -99,19 +72,32 @@
             touch-action: manipulation;
         }
 
-        .xvd-fab:hover,
         .xvd-fab:active {
-            transform: scale(1.1) rotate(10deg);
+            transform: scale(0.95);
         }
 
-        /* Modal Panel */
+        .xvd-fab-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #f4212e;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 10px;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        /* Modal Panel - Bottom Sheet Style */
         .xvd-modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             z-index: 999999;
             display: flex;
             align-items: flex-end;
@@ -128,10 +114,10 @@
 
         .xvd-modal {
             background: #15202b;
-            border-radius: 20px 20px 0 0;
+            border-radius: 24px 24px 0 0;
             width: 100%;
             max-width: 500px;
-            max-height: 80vh;
+            max-height: 85vh;
             overflow-y: auto;
             transform: translateY(100%);
             transition: transform 0.3s ease;
@@ -142,187 +128,185 @@
             transform: translateY(0);
         }
 
+        .xvd-drag-handle {
+            width: 40px;
+            height: 5px;
+            background: #38444d;
+            border-radius: 3px;
+            margin: 12px auto;
+        }
+
         .xvd-modal-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 20px;
+            padding: 15px 20px;
             border-bottom: 1px solid #38444d;
-            position: sticky;
-            top: 0;
-            background: #15202b;
         }
 
         .xvd-modal-title {
             color: white;
             font-size: 18px;
             font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 10px;
         }
 
         .xvd-modal-close {
             background: #38444d;
             border: none;
             color: white;
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
-            font-size: 20px;
+            font-size: 18px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .xvd-modal-body {
             padding: 20px;
         }
 
-        /* Video Item dalam Modal */
-        .xvd-video-item {
+        /* Video Card */
+        .xvd-video-card {
             background: #192734;
-            border-radius: 15px;
+            border-radius: 16px;
             padding: 15px;
             margin-bottom: 15px;
             border: 1px solid #38444d;
         }
 
-        .xvd-video-preview {
-            width: 100%;
-            border-radius: 10px;
-            margin-bottom: 15px;
-            max-height: 200px;
-            object-fit: cover;
+        .xvd-video-card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: #8899a6;
+            font-size: 13px;
         }
 
-        .xvd-quality-buttons {
+        .xvd-video-thumb {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            background: #000;
+        }
+
+        .xvd-video-info {
+            color: #8899a6;
+            font-size: 12px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+
+        /* Download Buttons */
+        .xvd-btn-group {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             gap: 10px;
         }
 
-        .xvd-quality-btn {
-            flex: 1;
-            min-width: 80px;
-            padding: 15px 10px;
-            background: #1d9bf0;
-            color: white;
+        .xvd-btn {
+            width: 100%;
+            padding: 16px 20px;
             border: none;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .xvd-quality-btn:hover,
-        .xvd-quality-btn:active {
-            background: #0d8bd9;
-            transform: scale(0.98);
-        }
-
-        .xvd-quality-btn .quality-label {
+            border-radius: 14px;
             font-size: 16px;
-        }
-
-        .xvd-quality-btn .quality-size {
-            font-size: 11px;
-            opacity: 0.8;
-        }
-
-        /* Status Messages */
-        .xvd-status {
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
-            text-align: center;
-            font-size: 14px;
-        }
-
-        .xvd-status.success {
-            background: rgba(0, 186, 124, 0.2);
-            color: #00ba7c;
-        }
-
-        .xvd-status.error {
-            background: rgba(244, 33, 46, 0.2);
-            color: #f4212e;
-        }
-
-        .xvd-status.loading {
-            background: rgba(29, 155, 240, 0.2);
-            color: #1d9bf0;
-        }
-
-        /* No Video Message */
-        .xvd-no-video {
-            text-align: center;
-            padding: 40px 20px;
-            color: #8899a6;
-        }
-
-        .xvd-no-video-icon {
-            font-size: 50px;
-            margin-bottom: 15px;
-        }
-
-        /* Drag Handle */
-        .xvd-drag-handle {
-            width: 40px;
-            height: 5px;
-            background: #38444d;
-            border-radius: 3px;
-            margin: 10px auto;
-        }
-
-        /* Tombol di Tweet */
-        .xvd-tweet-btn {
-            background: transparent;
-            border: none;
-            color: #8899a6;
-            padding: 8px;
-            border-radius: 50%;
+            font-weight: 600;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 10px;
             transition: all 0.2s ease;
-            min-width: 44px;
-            min-height: 44px;
+            touch-action: manipulation;
         }
 
-        .xvd-tweet-btn:hover {
-            background: rgba(29, 155, 240, 0.1);
-            color: #1d9bf0;
+        .xvd-btn-primary {
+            background: linear-gradient(135deg, #1d9bf0 0%, #0d8bd9 100%);
+            color: white;
         }
 
-        .xvd-tweet-btn svg {
-            width: 20px;
-            height: 20px;
+        .xvd-btn-primary:active {
+            transform: scale(0.98);
+            background: #0d8bd9;
         }
 
-        /* Toast Notification */
+        .xvd-btn-secondary {
+            background: #38444d;
+            color: white;
+        }
+
+        .xvd-btn-secondary:active {
+            background: #4a5568;
+        }
+
+        .xvd-btn-success {
+            background: linear-gradient(135deg, #00ba7c 0%, #00a06a 100%);
+            color: white;
+        }
+
+        .xvd-btn-icon {
+            font-size: 20px;
+        }
+
+        /* Status */
+        .xvd-status {
+            padding: 20px;
+            text-align: center;
+            color: #8899a6;
+        }
+
+        .xvd-status-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .xvd-status-text {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .xvd-status-subtext {
+            font-size: 13px;
+            opacity: 0.7;
+        }
+
+        /* Loading Spinner */
+        .xvd-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #38444d;
+            border-top-color: #1d9bf0;
+            border-radius: 50%;
+            animation: xvd-spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes xvd-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast */
         .xvd-toast {
             position: fixed;
-            bottom: 100px;
+            bottom: 170px;
             left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: #1d9bf0;
+            transform: translateX(-50%) translateY(20px);
+            background: #192734;
             color: white;
-            padding: 15px 25px;
+            padding: 14px 24px;
             border-radius: 30px;
             font-size: 14px;
             z-index: 9999999;
             opacity: 0;
             transition: all 0.3s ease;
-            white-space: nowrap;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            border: 1px solid #38444d;
+            max-width: 90%;
+            text-align: center;
         }
 
         .xvd-toast.show {
@@ -330,215 +314,256 @@
             transform: translateX(-50%) translateY(0);
         }
 
-        .xvd-toast.error {
-            background: #f4212e;
-        }
-
         .xvd-toast.success {
             background: #00ba7c;
+            border-color: #00ba7c;
         }
 
-        /* Progress Bar */
-        .xvd-progress-container {
+        .xvd-toast.error {
+            background: #f4212e;
+            border-color: #f4212e;
+        }
+
+        /* Progress */
+        .xvd-progress {
             width: 100%;
-            height: 6px;
+            height: 8px;
             background: #38444d;
-            border-radius: 3px;
-            margin-top: 10px;
+            border-radius: 4px;
             overflow: hidden;
+            margin-top: 10px;
         }
 
         .xvd-progress-bar {
             height: 100%;
             background: linear-gradient(90deg, #1d9bf0, #00ba7c);
-            border-radius: 3px;
+            border-radius: 4px;
             transition: width 0.3s ease;
-            width: 0%;
         }
 
-        /* Responsive */
-        @media (min-width: 500px) {
-            .xvd-modal {
-                border-radius: 20px;
-                margin: 20px;
-                margin-bottom: 40px;
-            }
+        /* Mobile Tips */
+        .xvd-mobile-tip {
+            background: rgba(29, 155, 240, 0.1);
+            border: 1px solid rgba(29, 155, 240, 0.3);
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-top: 15px;
+            color: #1d9bf0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
 
-            .xvd-fab {
-                bottom: 30px;
-                right: 30px;
+        .xvd-mobile-tip strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        /* Hide on desktop modal */
+        @media (min-width: 768px) {
+            .xvd-mobile-tip {
+                display: none;
             }
         }
     `);
 
-    // ==================== HELPER FUNCTIONS ====================
-    const SVG_ICONS = {
-        download: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-5H7l5-7 5 7h-4v5h-2z" transform="rotate(180 12 12)"/></svg>`,
-        close: '✕',
-        video: '🎬',
-        noVideo: '📭',
-        loading: '⏳'
-    };
-
-    function showToast(message, type = 'info') {
-        const existingToast = document.querySelector('.xvd-toast');
-        if (existingToast) existingToast.remove();
+    // ==================== UTILITIES ====================
+    function showToast(message, type = 'info', duration = 3000) {
+        const existing = document.querySelector('.xvd-toast');
+        if (existing) existing.remove();
 
         const toast = document.createElement('div');
         toast.className = `xvd-toast ${type}`;
         toast.textContent = message;
         document.body.appendChild(toast);
 
-        setTimeout(() => toast.classList.add('show'), 10);
+        requestAnimationFrame(() => {
+            toast.classList.add('show');
+        });
+
         setTimeout(() => {
             toast.classList.remove('show');
             setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        }, duration);
     }
 
-    function getTweetId(element) {
-        // Cari dari URL di tweet
-        const link = element.querySelector('a[href*="/status/"]');
-        if (link) {
-            const match = link.href.match(/\/status\/(\d+)/);
-            if (match) return match[1];
-        }
-        
-        // Cari dari URL halaman
-        const urlMatch = window.location.href.match(/\/status\/(\d+)/);
-        if (urlMatch) return urlMatch[0];
-        
-        return null;
+    function extractTweetId(url) {
+        const match = url.match(/status\/(\d+)/);
+        return match ? match[1] : null;
     }
 
-    function extractVideoFromTweet(tweetElement) {
-        const videos = [];
-        
-        // Cari video element
-        const videoElements = tweetElement.querySelectorAll('video');
-        videoElements.forEach((video, index) => {
-            const sources = [];
-            
-            // Cek src langsung
-            if (video.src && !video.src.startsWith('blob:')) {
-                sources.push({ url: video.src, quality: 'Default' });
-            }
-            
-            // Cek source elements
-            video.querySelectorAll('source').forEach(source => {
-                if (source.src && !source.src.startsWith('blob:')) {
-                    sources.push({ url: source.src, quality: 'Source' });
-                }
-            });
-            
-            // Cek poster untuk thumbnail
-            const poster = video.poster || '';
-            
-            videos.push({
-                element: video,
-                poster: poster,
-                sources: sources,
-                index: index
-            });
-        });
-        
-        return videos;
-    }
+    // ==================== VIDEO FETCHER ====================
+    async function fetchVideoInfo(tweetUrl) {
+        const tweetId = extractTweetId(tweetUrl);
+        if (!tweetId) throw new Error('Invalid tweet URL');
 
-    async function getVideoInfo(tweetId) {
+        // API yang lebih reliable
+        const apiUrl = `https://api.vxtwitter.com/Twitter/status/${tweetId}`;
+
         return new Promise((resolve, reject) => {
-            // Gunakan API tidak resmi untuk mendapatkan info video
-            const apiUrl = `https://api.vxtwitter.com/Twitter/status/${tweetId}`;
-            
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: apiUrl,
+                timeout: 15000,
                 onload: function(response) {
                     try {
                         const data = JSON.parse(response.responseText);
-                        if (data.media_extended) {
-                            resolve(data.media_extended.filter(m => m.type === 'video'));
-                        } else {
-                            reject('No video found');
-                        }
-                    } catch (e) {
-                        reject(e);
-                    }
-                },
-                onerror: reject
-            });
-        });
-    }
-
-    async function getVideoFromPage(tweetUrl) {
-        return new Promise((resolve, reject) => {
-            // Coba berbagai API alternatif
-            const apis = [
-                `https://api.vxtwitter.com${new URL(tweetUrl).pathname}`,
-                `https://twitsave.com/info?url=${encodeURIComponent(tweetUrl)}`
-            ];
-            
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: apis[0],
-                onload: function(response) {
-                    try {
-                        const data = JSON.parse(response.responseText);
-                        if (data.media_extended) {
+                        
+                        if (data.media_extended && data.media_extended.length > 0) {
                             const videos = data.media_extended
                                 .filter(m => m.type === 'video' || m.type === 'gif')
                                 .map(v => ({
                                     url: v.url,
-                                    thumbnail: v.thumbnail_url,
-                                    type: v.type
+                                    thumbnail: v.thumbnail_url || '',
+                                    type: v.type,
+                                    duration: v.duration_millis ? Math.round(v.duration_millis / 1000) : 0
                                 }));
-                            resolve(videos);
-                        } else {
-                            reject('No video found');
+                            
+                            if (videos.length > 0) {
+                                resolve({
+                                    videos,
+                                    author: data.user_name || 'unknown',
+                                    text: data.text || '',
+                                    tweetId
+                                });
+                                return;
+                            }
                         }
+                        reject(new Error('No video found in tweet'));
                     } catch (e) {
                         reject(e);
                     }
                 },
-                onerror: reject
+                onerror: () => reject(new Error('Network error')),
+                ontimeout: () => reject(new Error('Request timeout'))
             });
         });
     }
 
-    function downloadVideo(url, filename) {
-        showToast('Memulai unduhan...', 'info');
+    // ==================== DOWNLOAD METHODS ====================
+    
+    // Method 1: Direct Link (Paling reliable untuk mobile)
+    function downloadDirect(url, filename) {
+        // Buka di tab baru - user bisa long press untuk save
+        const newTab = window.open(url, '_blank');
         
-        // Metode 1: GM_download
-        if (typeof GM_download !== 'undefined') {
-            GM_download({
-                url: url,
-                name: filename || `x_video_${Date.now()}.mp4`,
-                onload: () => showToast('Unduhan selesai!', 'success'),
-                onerror: (e) => {
-                    console.error('GM_download error:', e);
-                    // Fallback ke metode 2
-                    downloadViaLink(url, filename);
-                }
-            });
+        if (newTab) {
+            showToast('📱 Video dibuka di tab baru. Tekan tahan video untuk menyimpan!', 'success', 5000);
         } else {
-            downloadViaLink(url, filename);
+            // Popup blocked, coba cara lain
+            window.location.href = url;
         }
     }
 
-    function downloadViaLink(url, filename) {
-        // Untuk mobile, buka di tab baru
-        if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            window.open(url, '_blank');
-            showToast('Video dibuka di tab baru. Tekan tahan untuk menyimpan.', 'info');
+    // Method 2: Blob Download (Untuk desktop atau jika method 1 gagal)
+    function downloadBlob(url, filename) {
+        showToast('⏳ Mengunduh video...', 'info', 10000);
+
+        GM_xmlhttpRequest({
+            method: 'GET',
+            url: url,
+            responseType: 'blob',
+            onprogress: function(progress) {
+                if (progress.lengthComputable) {
+                    const percent = Math.round((progress.loaded / progress.total) * 100);
+                    updateProgress(percent);
+                }
+            },
+            onload: function(response) {
+                try {
+                    const blob = response.response;
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename;
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(blobUrl);
+                    }, 1000);
+
+                    showToast('✅ Video berhasil diunduh!', 'success');
+                    hideProgress();
+                } catch (e) {
+                    console.error('Blob download error:', e);
+                    showToast('❌ Gagal menyimpan. Mencoba cara lain...', 'error');
+                    downloadDirect(url, filename);
+                }
+            },
+            onerror: function(e) {
+                console.error('Download error:', e);
+                showToast('⚠️ Gagal mengunduh. Membuka video...', 'error');
+                hideProgress();
+                downloadDirect(url, filename);
+            }
+        });
+    }
+
+    // Method 3: Copy URL
+    function copyVideoUrl(url) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url)
+                .then(() => showToast('📋 URL video disalin!', 'success'))
+                .catch(() => fallbackCopy(url));
         } else {
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename || `x_video_${Date.now()}.mp4`;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            showToast('Unduhan dimulai!', 'success');
+            fallbackCopy(url);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+            document.execCommand('copy');
+            showToast('📋 URL video disalin!', 'success');
+        } catch (e) {
+            showToast('❌ Gagal menyalin URL', 'error');
+        }
+        
+        document.body.removeChild(textarea);
+    }
+
+    // Smart Download - pilih method terbaik
+    function smartDownload(url, filename) {
+        if (isMobile) {
+            // Di mobile, langsung buka di tab baru
+            downloadDirect(url, filename);
+        } else {
+            // Di desktop, coba blob download
+            downloadBlob(url, filename);
+        }
+    }
+
+    // ==================== PROGRESS UI ====================
+    let progressElement = null;
+
+    function showProgress() {
+        if (!progressElement) {
+            progressElement = document.createElement('div');
+            progressElement.className = 'xvd-progress';
+            progressElement.innerHTML = '<div class="xvd-progress-bar" style="width: 0%"></div>';
+        }
+        return progressElement;
+    }
+
+    function updateProgress(percent) {
+        if (progressElement) {
+            const bar = progressElement.querySelector('.xvd-progress-bar');
+            if (bar) bar.style.width = `${percent}%`;
+        }
+    }
+
+    function hideProgress() {
+        if (progressElement && progressElement.parentElement) {
+            progressElement.remove();
         }
     }
 
@@ -546,132 +571,191 @@
     function createModal() {
         const overlay = document.createElement('div');
         overlay.className = 'xvd-modal-overlay';
+        overlay.id = 'xvd-modal';
         overlay.innerHTML = `
             <div class="xvd-modal">
                 <div class="xvd-drag-handle"></div>
                 <div class="xvd-modal-header">
-                    <span class="xvd-modal-title">
-                        ${SVG_ICONS.video} Video Downloader
-                    </span>
-                    <button class="xvd-modal-close">${SVG_ICONS.close}</button>
+                    <span class="xvd-modal-title">📥 Download Video</span>
+                    <button class="xvd-modal-close">✕</button>
                 </div>
-                <div class="xvd-modal-body">
-                    <div class="xvd-loading">
-                        <div class="xvd-status loading">🔍 Mencari video di halaman...</div>
+                <div class="xvd-modal-body" id="xvd-modal-body">
+                    <div class="xvd-status">
+                        <div class="xvd-spinner"></div>
+                        <div class="xvd-status-text">Mencari video...</div>
                     </div>
                 </div>
             </div>
         `;
 
-        overlay.querySelector('.xvd-modal-close').onclick = () => hideModal();
+        overlay.querySelector('.xvd-modal-close').onclick = hideModal;
         overlay.onclick = (e) => {
             if (e.target === overlay) hideModal();
         };
+
+        // Swipe down to close
+        let startY = 0;
+        const modal = overlay.querySelector('.xvd-modal');
+        modal.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+        });
+        modal.addEventListener('touchmove', (e) => {
+            const diff = e.touches[0].clientY - startY;
+            if (diff > 100) hideModal();
+        });
 
         document.body.appendChild(overlay);
         return overlay;
     }
 
-    function showModal() {
-        let modal = document.querySelector('.xvd-modal-overlay');
-        if (!modal) modal = createModal();
+    function showModal(tweetUrl = null) {
+        let overlay = document.getElementById('xvd-modal');
+        if (!overlay) overlay = createModal();
         
-        setTimeout(() => modal.classList.add('show'), 10);
-        scanForVideos();
+        requestAnimationFrame(() => {
+            overlay.classList.add('show');
+        });
+
+        if (tweetUrl) {
+            loadVideoForModal(tweetUrl);
+        } else {
+            findAndLoadVideos();
+        }
     }
 
     function hideModal() {
-        const modal = document.querySelector('.xvd-modal-overlay');
-        if (modal) {
-            modal.classList.remove('show');
+        const overlay = document.getElementById('xvd-modal');
+        if (overlay) {
+            overlay.classList.remove('show');
         }
     }
 
-    async function scanForVideos() {
-        const modalBody = document.querySelector('.xvd-modal-body');
-        if (!modalBody) return;
+    async function loadVideoForModal(tweetUrl) {
+        const body = document.getElementById('xvd-modal-body');
+        if (!body) return;
 
-        modalBody.innerHTML = '<div class="xvd-status loading">🔍 Mencari video...</div>';
+        body.innerHTML = `
+            <div class="xvd-status">
+                <div class="xvd-spinner"></div>
+                <div class="xvd-status-text">Memproses video...</div>
+            </div>
+        `;
 
-        // Cari semua tweet dengan video di halaman
-        const tweetLinks = [...document.querySelectorAll('a[href*="/status/"]')]
-            .map(a => a.href)
-            .filter(href => /\/status\/\d+/.test(href))
-            .filter((v, i, a) => a.indexOf(v) === i);
-
-        const currentUrl = window.location.href;
-        if (/\/status\/\d+/.test(currentUrl) && !tweetLinks.includes(currentUrl)) {
-            tweetLinks.unshift(currentUrl);
-        }
-
-        if (tweetLinks.length === 0) {
-            modalBody.innerHTML = `
-                <div class="xvd-no-video">
-                    <div class="xvd-no-video-icon">${SVG_ICONS.noVideo}</div>
-                    <div>Tidak ada tweet ditemukan di halaman ini</div>
-                    <div style="margin-top:10px;font-size:12px;">Buka tweet yang berisi video terlebih dahulu</div>
+        try {
+            const info = await fetchVideoInfo(tweetUrl);
+            renderVideoCards(info);
+        } catch (e) {
+            body.innerHTML = `
+                <div class="xvd-status">
+                    <div class="xvd-status-icon">😕</div>
+                    <div class="xvd-status-text">Tidak dapat memuat video</div>
+                    <div class="xvd-status-subtext">${e.message}</div>
                 </div>
+                <button class="xvd-btn xvd-btn-secondary" onclick="window.open('${tweetUrl}', '_blank')">
+                    <span class="xvd-btn-icon">🔗</span>
+                    Buka Tweet
+                </button>
             `;
-            return;
         }
+    }
 
-        // Scan untuk video
-        let videosFound = [];
+    async function findAndLoadVideos() {
+        const body = document.getElementById('xvd-modal-body');
+        if (!body) return;
+
+        // Cari URL tweet di halaman saat ini
+        let tweetUrl = window.location.href;
         
-        for (const tweetUrl of tweetLinks.slice(0, 10)) { // Batasi 10 tweet
-            try {
-                const videos = await getVideoFromPage(tweetUrl);
-                if (videos && videos.length > 0) {
-                    videosFound.push({
-                        tweetUrl,
-                        videos
-                    });
-                }
-            } catch (e) {
-                console.log('Error scanning:', tweetUrl, e);
+        if (!extractTweetId(tweetUrl)) {
+            // Cari dari tweet yang visible
+            const tweetLink = document.querySelector('a[href*="/status/"]');
+            if (tweetLink) {
+                tweetUrl = tweetLink.href;
+            } else {
+                body.innerHTML = `
+                    <div class="xvd-status">
+                        <div class="xvd-status-icon">🔍</div>
+                        <div class="xvd-status-text">Tidak ada video ditemukan</div>
+                        <div class="xvd-status-subtext">Buka tweet yang berisi video terlebih dahulu</div>
+                    </div>
+                `;
+                return;
             }
         }
 
-        if (videosFound.length === 0) {
-            modalBody.innerHTML = `
-                <div class="xvd-no-video">
-                    <div class="xvd-no-video-icon">${SVG_ICONS.noVideo}</div>
-                    <div>Tidak ada video ditemukan</div>
-                    <div style="margin-top:10px;font-size:12px;">Pastikan tweet memiliki video</div>
+        await loadVideoForModal(tweetUrl);
+    }
+
+    function renderVideoCards(info) {
+        const body = document.getElementById('xvd-modal-body');
+        if (!body) return;
+
+        let html = '';
+
+        info.videos.forEach((video, index) => {
+            const filename = `${info.author}_${info.tweetId}_${index + 1}.mp4`;
+            const duration = video.duration ? `${Math.floor(video.duration / 60)}:${String(video.duration % 60).padStart(2, '0')}` : '';
+
+            html += `
+                <div class="xvd-video-card">
+                    <div class="xvd-video-card-header">
+                        <span>📹 Video ${info.videos.length > 1 ? index + 1 : ''}</span>
+                        ${duration ? `<span>⏱️ ${duration}</span>` : ''}
+                        <span>${video.type.toUpperCase()}</span>
+                    </div>
+                    
+                    ${video.thumbnail ? `<img class="xvd-video-thumb" src="${video.thumbnail}" alt="Thumbnail">` : ''}
+                    
+                    <div class="xvd-btn-group">
+                        <button class="xvd-btn xvd-btn-primary" data-action="download" data-url="${video.url}" data-filename="${filename}">
+                            <span class="xvd-btn-icon">📥</span>
+                            ${isMobile ? 'Buka & Simpan Video' : 'Download Video'}
+                        </button>
+                        
+                        <button class="xvd-btn xvd-btn-secondary" data-action="copy" data-url="${video.url}">
+                            <span class="xvd-btn-icon">📋</span>
+                            Salin URL Video
+                        </button>
+                        
+                        <button class="xvd-btn xvd-btn-secondary" data-action="preview" data-url="${video.url}">
+                            <span class="xvd-btn-icon">👁️</span>
+                            Preview di Tab Baru
+                        </button>
+                    </div>
+                    
+                    ${isMobile ? `
+                        <div class="xvd-mobile-tip">
+                            <strong>💡 Cara menyimpan di HP:</strong>
+                            1. Tekan "Buka & Simpan Video"<br>
+                            2. Video akan terbuka di tab baru<br>
+                            3. <strong>Tekan tahan</strong> pada video<br>
+                            4. Pilih "Download" atau "Simpan Video"
+                        </div>
+                    ` : ''}
                 </div>
             `;
-            return;
-        }
-
-        // Tampilkan video yang ditemukan
-        let html = '';
-        videosFound.forEach((item, idx) => {
-            item.videos.forEach((video, vidIdx) => {
-                html += `
-                    <div class="xvd-video-item">
-                        ${video.thumbnail ? `<img class="xvd-video-preview" src="${video.thumbnail}" alt="Video preview">` : ''}
-                        <div class="xvd-quality-buttons">
-                            <button class="xvd-quality-btn" data-url="${video.url}" data-idx="${idx}-${vidIdx}">
-                                <span class="quality-label">📥 Download</span>
-                                <span class="quality-size">${video.type === 'gif' ? 'GIF' : 'MP4'}</span>
-                            </button>
-                            <button class="xvd-quality-btn" onclick="window.open('${video.url}', '_blank')" style="background:#38444d;">
-                                <span class="quality-label">👁️ Preview</span>
-                                <span class="quality-size">Buka di tab baru</span>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
         });
 
-        modalBody.innerHTML = html || '<div class="xvd-status error">Tidak ada video ditemukan</div>';
+        body.innerHTML = html;
 
-        // Add click handlers
-        modalBody.querySelectorAll('.xvd-quality-btn[data-url]').forEach(btn => {
+        // Event listeners
+        body.querySelectorAll('[data-action]').forEach(btn => {
             btn.onclick = () => {
+                const action = btn.dataset.action;
                 const url = btn.dataset.url;
-                downloadVideo(url, `x_video_${Date.now()}.mp4`);
+                const filename = btn.dataset.filename;
+
+                switch(action) {
+                    case 'download':
+                        smartDownload(url, filename);
+                        break;
+                    case 'copy':
+                        copyVideoUrl(url);
+                        break;
+                    case 'preview':
+                        window.open(url, '_blank');
+                        break;
+                }
             };
         });
     }
@@ -682,93 +766,56 @@
 
         const fab = document.createElement('button');
         fab.className = 'xvd-fab';
-        fab.innerHTML = SVG_ICONS.download;
-        fab.title = 'Download Video';
-        fab.onclick = showModal;
-
+        fab.innerHTML = '📥';
+        fab.onclick = () => showModal();
         document.body.appendChild(fab);
     }
 
-    // ==================== TWEET BUTTONS ====================
-    function addDownloadButtonToTweet(tweetElement) {
-        if (tweetElement.querySelector('.xvd-tweet-btn')) return;
-        if (!tweetElement.querySelector('video')) return;
-
-        // Cari action bar
-        const actionBar = tweetElement.querySelector('[role="group"]');
-        if (!actionBar) return;
-
-        const btn = document.createElement('button');
-        btn.className = 'xvd-tweet-btn';
-        btn.innerHTML = SVG_ICONS.download;
-        btn.title = 'Download Video';
-        
-        btn.onclick = async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            btn.classList.add('loading');
-            
-            // Cari tweet URL
-            const link = tweetElement.querySelector('a[href*="/status/"]');
-            if (link) {
-                try {
-                    const videos = await getVideoFromPage(link.href);
-                    if (videos && videos.length > 0) {
-                        downloadVideo(videos[0].url, `x_video_${Date.now()}.mp4`);
-                    } else {
-                        showToast('Video tidak ditemukan', 'error');
-                    }
-                } catch (e) {
-                    showToast('Gagal mengambil video', 'error');
-                }
-            }
-            
-            btn.classList.remove('loading');
-        };
-
-        actionBar.appendChild(btn);
-    }
-
-    function addVideoOverlayButtons() {
+    // ==================== VIDEO OVERLAY BUTTON ====================
+    function addOverlayButtons() {
         document.querySelectorAll('video').forEach(video => {
-            const container = video.closest('div[data-testid="videoComponent"]') || video.parentElement;
+            const container = video.closest('[data-testid="videoComponent"]') 
+                            || video.closest('[data-testid="tweetPhoto"]')
+                            || video.parentElement;
+            
             if (!container || container.querySelector('.xvd-download-btn')) return;
+            if (container.closest('.xvd-modal')) return; // Skip modal videos
 
             container.style.position = 'relative';
 
             const btn = document.createElement('button');
             btn.className = 'xvd-download-btn';
             btn.innerHTML = '📥';
-            btn.title = 'Download Video';
             
             btn.onclick = async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 
-                btn.classList.add('loading');
-                btn.innerHTML = '';
-                
-                // Cari tweet parent
-                const tweet = container.closest('article');
-                if (tweet) {
-                    const link = tweet.querySelector('a[href*="/status/"]');
-                    if (link) {
-                        try {
-                            const videos = await getVideoFromPage(link.href);
-                            if (videos && videos.length > 0) {
-                                downloadVideo(videos[0].url, `x_video_${Date.now()}.mp4`);
-                            } else {
-                                showToast('Video tidak ditemukan', 'error');
-                            }
-                        } catch (e) {
-                            showToast('Gagal mengambil video', 'error');
-                        }
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '⏳';
+                btn.disabled = true;
+
+                try {
+                    // Cari tweet URL
+                    const article = container.closest('article');
+                    let tweetUrl = window.location.href;
+                    
+                    if (article) {
+                        const link = article.querySelector('a[href*="/status/"]');
+                        if (link) tweetUrl = link.href;
                     }
+
+                    const info = await fetchVideoInfo(tweetUrl);
+                    if (info.videos.length > 0) {
+                        const filename = `${info.author}_${info.tweetId}.mp4`;
+                        smartDownload(info.videos[0].url, filename);
+                    }
+                } catch (e) {
+                    showToast('❌ ' + e.message, 'error');
                 }
-                
-                btn.classList.remove('loading');
-                btn.innerHTML = '📥';
+
+                btn.innerHTML = originalText;
+                btn.disabled = false;
             };
 
             container.appendChild(btn);
@@ -776,23 +823,9 @@
     }
 
     // ==================== OBSERVER ====================
-    function observeDOM() {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === 1) {
-                        // Cek jika node adalah article (tweet)
-                        if (node.matches && node.matches('article')) {
-                            addDownloadButtonToTweet(node);
-                        }
-                        // Cek children
-                        node.querySelectorAll && node.querySelectorAll('article').forEach(addDownloadButtonToTweet);
-                    }
-                });
-            });
-            
-            // Update video overlay buttons
-            addVideoOverlayButtons();
+    function startObserver() {
+        const observer = new MutationObserver(() => {
+            addOverlayButtons();
         });
 
         observer.observe(document.body, {
@@ -803,24 +836,19 @@
 
     // ==================== INIT ====================
     function init() {
-        console.log('🎬 X/Twitter Video Downloader initialized');
-        
-        // Create FAB
+        console.log('🎬 X Video Downloader v3.0 loaded');
+        console.log('📱 Mobile mode:', isMobile);
+
         createFAB();
-        
-        // Add buttons to existing tweets
-        document.querySelectorAll('article').forEach(addDownloadButtonToTweet);
-        addVideoOverlayButtons();
-        
-        // Observe for new content
-        observeDOM();
+        addOverlayButtons();
+        startObserver();
     }
 
-    // Start
+    // Run
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
-        init();
+        setTimeout(init, 1000);
     }
 
 })();

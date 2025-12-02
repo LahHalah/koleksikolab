@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         X Video Downloader - Firefox Android
+// @name         X Video Downloader - DOM Mode (Firefox Android)
 // @namespace    http://tampermonkey.net/
-// @version      5.0
-// @description  Download video X/Twitter - Optimized for Firefox/Iceraven Android
+// @version      6.0
+// @description  Download video X/Twitter termasuk dari akun terkunci - DOM Direct Access
 // @author       Assistant
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -151,6 +151,26 @@
             margin-top: 10px;
         }
 
+        /* Mode Badge */
+        .xvd-mode-badge {
+            display: inline-block;
+            background: #7c3aed;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .xvd-mode-badge.api {
+            background: #10b981;
+        }
+
+        .xvd-mode-badge.dom {
+            background: #f59e0b;
+        }
+
         /* Video Container */
         .xvd-vid-container {
             background: #000;
@@ -165,7 +185,7 @@
             display: block;
         }
 
-        /* Instruction Banner - PENTING! */
+        /* Instruction Banner */
         .xvd-instruction {
             background: linear-gradient(135deg, #1d9bf0 0%, #0d8ed9 100%);
             color: white;
@@ -173,6 +193,10 @@
             border-radius: 12px;
             margin-bottom: 16px;
             text-align: center;
+        }
+
+        .xvd-instruction.warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         }
 
         .xvd-instruction-icon {
@@ -191,7 +215,7 @@
             opacity: 0.9;
         }
 
-        /* Download Link - INI YANG PALING PENTING */
+        /* Download Link */
         .xvd-download-link {
             display: block;
             background: #00ba7c;
@@ -214,6 +238,7 @@
         .xvd-btn-row {
             display: flex;
             gap: 10px;
+            margin-bottom: 12px;
         }
 
         .xvd-btn-sec {
@@ -231,6 +256,15 @@
 
         .xvd-btn-sec:active {
             background: #3f4448;
+        }
+
+        .xvd-btn-primary {
+            background: #1d9bf0;
+            color: white;
+        }
+
+        .xvd-btn-primary:active {
+            background: #1a8cd8;
         }
 
         /* Steps */
@@ -347,6 +381,36 @@
         .xvd-toast.err {
             background: #ef4444;
         }
+
+        /* Info Banner */
+        .xvd-info-banner {
+            background: #1d1f23;
+            border-left: 3px solid #1d9bf0;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .xvd-info-banner.warning {
+            border-left-color: #f59e0b;
+        }
+
+        .xvd-info-title {
+            color: #1d9bf0;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .xvd-info-title.warning {
+            color: #f59e0b;
+        }
+
+        .xvd-info-text {
+            color: #e7e9ea;
+            font-size: 13px;
+            line-height: 1.4;
+        }
     `);
 
     // ========== TOAST ==========
@@ -386,16 +450,66 @@
         return m ? m[1] : null;
     }
 
-    // ========== FETCH VIDEO ==========
-    function fetchVideo(tweetUrl) {
+    // ========== GET VIDEO FROM DOM (PRIORITAS UTAMA) ==========
+    function getVideoFromDOM() {
+        console.log('🔍 Mencari video di DOM...');
+        
+        const videos = document.querySelectorAll('video');
+        console.log(`Found ${videos.length} video elements`);
+        
+        const results = [];
+        
+        for (const vid of videos) {
+            let videoUrl = null;
+            let thumb = vid.poster || '';
+            
+            // Cek src langsung
+            if (vid.src && (vid.src.includes('video.twimg.com') || vid.src.includes('blob:'))) {
+                videoUrl = vid.src;
+            }
+            
+            // Cek source element
+            if (!videoUrl) {
+                const source = vid.querySelector('source');
+                if (source && source.src && (source.src.includes('video.twimg.com') || source.src.includes('blob:'))) {
+                    videoUrl = source.src;
+                }
+            }
+            
+            // Cek di data attributes
+            if (!videoUrl) {
+                const dataUrl = vid.getAttribute('data-src') || vid.getAttribute('data-video-url');
+                if (dataUrl && (dataUrl.includes('video.twimg.com') || dataUrl.includes('blob:'))) {
+                    videoUrl = dataUrl;
+                }
+            }
+            
+            if (videoUrl) {
+                console.log('✓ Video ditemukan:', videoUrl.substring(0, 80) + '...');
+                results.push({
+                    url: videoUrl,
+                    thumb: thumb,
+                    element: vid,
+                    isBlob: videoUrl.includes('blob:')
+                });
+            }
+        }
+        
+        return results.length > 0 ? results : null;
+    }
+
+    // ========== FETCH VIDEO VIA API (FALLBACK) ==========
+    function fetchVideoAPI(tweetUrl) {
         return new Promise((resolve, reject) => {
             const id = getTweetId(tweetUrl);
             if (!id) return reject('URL tidak valid');
 
+            console.log('📡 Mencoba API untuk tweet:', id);
+
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: `https://api.vxtwitter.com/Twitter/status/${id}`,
-                timeout: 20000,
+                timeout: 15000,
                 onload: (r) => {
                     try {
                         const d = JSON.parse(r.responseText);
@@ -408,20 +522,22 @@
                                     type: v.type
                                 }));
                             if (vids.length) {
+                                console.log('✓ API berhasil');
                                 return resolve({
                                     videos: vids,
                                     user: d.user_name || 'user',
-                                    id: id
+                                    id: id,
+                                    mode: 'api'
                                 });
                             }
                         }
-                        reject('Tweet ini tidak mengandung video');
+                        reject('API: Tweet tidak mengandung video');
                     } catch (e) {
-                        reject('Gagal memproses data');
+                        reject('API: Gagal memproses data');
                     }
                 },
-                onerror: () => reject('Koneksi gagal'),
-                ontimeout: () => reject('Request timeout')
+                onerror: () => reject('API: Koneksi gagal'),
+                ontimeout: () => reject('API: Request timeout')
             });
         });
     }
@@ -437,7 +553,7 @@
         backdrop.innerHTML = `
             <div class="xvd-box">
                 <div class="xvd-head">
-                    <span class="xvd-head-title">📥 Download Video</span>
+                    <span class="xvd-head-title">🔥 Download Video</span>
                     <button class="xvd-head-close">✕</button>
                 </div>
                 <div class="xvd-body"></div>
@@ -466,10 +582,10 @@
         if (body) body.innerHTML = html;
     }
 
-    function showLoading() {
+    function showLoading(msg = 'Mengambil video...') {
         setBody(`
             <div class="xvd-spin"></div>
-            <div class="xvd-loading-text">Mengambil video...</div>
+            <div class="xvd-loading-text">${msg}</div>
         `);
     }
 
@@ -480,25 +596,81 @@
                 <div class="xvd-error-msg">Gagal</div>
                 <div class="xvd-error-detail">${msg}</div>
             </div>
+            <div class="xvd-steps">
+                <div class="xvd-steps-title">💡 Tips:</div>
+                <div class="xvd-step">
+                    <span class="xvd-step-num">1</span>
+                    <span>Pastikan video sudah dimuat/terlihat di layar</span>
+                </div>
+                <div class="xvd-step">
+                    <span class="xvd-step-num">2</span>
+                    <span>Untuk akun terkunci, pastikan sudah follow akun tersebut</span>
+                </div>
+                <div class="xvd-step">
+                    <span class="xvd-step-num">3</span>
+                    <span>Scroll ke video lalu tekan tombol 🔥 di atas video</span>
+                </div>
+            </div>
         `);
     }
 
     function showResult(data) {
         const v = data.videos[0];
-        const filename = `${data.user}_${data.id}.mp4`;
+        const id = data.id || Date.now().toString();
+        const user = data.user || 'video';
+        const mode = data.mode || 'dom';
+        const filename = `${user}_${id}.mp4`;
+        
+        const isBlob = v.url.includes('blob:');
+        const isProtected = mode === 'dom';
+
+        let instructionHTML = '';
+        let infoBannerHTML = '';
+
+        if (isProtected) {
+            instructionHTML = `
+                <div class="xvd-instruction warning">
+                    <div class="xvd-instruction-icon">⚠️</div>
+                    <div class="xvd-instruction-main">AKUN TERKUNCI / PROTECTED</div>
+                    <div class="xvd-instruction-sub">Video diambil langsung dari halaman (DOM Mode)</div>
+                </div>
+            `;
+            
+            infoBannerHTML = `
+                <div class="xvd-info-banner warning">
+                    <div class="xvd-info-title warning">⚠️ Catatan Penting:</div>
+                    <div class="xvd-info-text">
+                        Untuk akun terkunci, cara terbaik:<br>
+                        <strong>1. Buka video di tab baru</strong><br>
+                        <strong>2. Tekan tahan video → "Save video"</strong>
+                    </div>
+                </div>
+            `;
+        } else {
+            instructionHTML = `
+                <div class="xvd-instruction">
+                    <div class="xvd-instruction-icon">👇</div>
+                    <div class="xvd-instruction-main">TEKAN TAHAN TOMBOL HIJAU</div>
+                    <div class="xvd-instruction-sub">Lalu pilih "Download link" atau "Simpan tautan"</div>
+                </div>
+            `;
+        }
 
         setBody(`
-            <div class="xvd-instruction">
-                <div class="xvd-instruction-icon">👇</div>
-                <div class="xvd-instruction-main">TEKAN TAHAN TOMBOL HIJAU</div>
-                <div class="xvd-instruction-sub">Lalu pilih "Download link" atau "Simpan tautan"</div>
+            ${instructionHTML}
+
+            ${infoBannerHTML}
+
+            <div class="xvd-btn-row">
+                <button class="xvd-btn-sec xvd-btn-primary" id="xvd-newtab-btn">📱 Buka di Tab Baru</button>
+                <button class="xvd-btn-sec" id="xvd-copy-btn">📋 Salin URL</button>
             </div>
 
             <a href="${v.url}" 
                class="xvd-download-link" 
                download="${filename}"
                type="video/mp4">
-                📥 TEKAN TAHAN DI SINI UNTUK DOWNLOAD
+                🔥 ATAU TEKAN TAHAN DI SINI
             </a>
 
             <div class="xvd-vid-container">
@@ -511,25 +683,45 @@
                 </video>
             </div>
 
-            <div class="xvd-btn-row">
-                <button class="xvd-btn-sec" id="xvd-copy-btn">📋 Salin URL</button>
-                <button class="xvd-btn-sec" id="xvd-newtab-btn">🔗 Tab Baru</button>
+            <div class="xvd-info-banner">
+                <div class="xvd-info-title">Mode: <span class="xvd-mode-badge ${mode}">${mode.toUpperCase()}</span></div>
+                <div class="xvd-info-text">
+                    ${mode === 'dom' ? 
+                        'Video diambil langsung dari halaman. Untuk akun terkunci, buka di tab baru lalu save.' : 
+                        'Video diambil via API publik.'
+                    }
+                </div>
             </div>
 
             <div class="xvd-steps">
-                <div class="xvd-steps-title">📱 Cara Download di Firefox/Iceraven:</div>
-                <div class="xvd-step">
-                    <span class="xvd-step-num">1</span>
-                    <span><strong>Tekan tahan</strong> tombol hijau di atas</span>
-                </div>
-                <div class="xvd-step">
-                    <span class="xvd-step-num">2</span>
-                    <span>Pilih <strong>"Download link"</strong> atau <strong>"Simpan tautan"</strong></span>
-                </div>
-                <div class="xvd-step">
-                    <span class="xvd-step-num">3</span>
-                    <span>Video tersimpan di folder <strong>Download</strong></span>
-                </div>
+                <div class="xvd-steps-title">📱 Cara Download (${isProtected ? 'Akun Terkunci' : 'Recommended'}):</div>
+                ${isProtected ? `
+                    <div class="xvd-step">
+                        <span class="xvd-step-num">1</span>
+                        <span>Tekan tombol <strong>"Buka di Tab Baru"</strong> di atas</span>
+                    </div>
+                    <div class="xvd-step">
+                        <span class="xvd-step-num">2</span>
+                        <span><strong>Tekan tahan</strong> pada video yang muncul</span>
+                    </div>
+                    <div class="xvd-step">
+                        <span class="xvd-step-num">3</span>
+                        <span>Pilih <strong>"Save video"</strong> atau <strong>"Download video"</strong></span>
+                    </div>
+                ` : `
+                    <div class="xvd-step">
+                        <span class="xvd-step-num">1</span>
+                        <span><strong>Tekan tahan</strong> tombol hijau di atas</span>
+                    </div>
+                    <div class="xvd-step">
+                        <span class="xvd-step-num">2</span>
+                        <span>Pilih <strong>"Download link"</strong> atau <strong>"Simpan tautan"</strong></span>
+                    </div>
+                    <div class="xvd-step">
+                        <span class="xvd-step-num">3</span>
+                        <span>Video tersimpan di folder <strong>Download</strong></span>
+                    </div>
+                `}
             </div>
 
             <div class="xvd-url-box">
@@ -541,7 +733,6 @@
         // Event handlers
         document.getElementById('xvd-copy-btn').onclick = () => copyText(v.url);
         document.getElementById('xvd-newtab-btn').onclick = () => {
-            // Untuk Firefox Android, buat anchor dan trigger click
             const a = document.createElement('a');
             a.href = v.url;
             a.target = '_blank';
@@ -549,18 +740,44 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            toast('✓ Video dibuka di tab baru');
         };
     }
 
-    // ========== MAIN ==========
+    // ========== MAIN PROCESS (DOM FIRST) ==========
     async function processUrl(url) {
         openModal();
-        showLoading();
+        showLoading('Mencari video...');
 
+        // PRIORITAS 1: Coba ambil dari DOM dulu (untuk akun terkunci)
+        console.log('🎯 Metode DOM (Prioritas Utama)');
+        const domVideos = getVideoFromDOM();
+        
+        if (domVideos && domVideos.length > 0) {
+            console.log('✓ Video ditemukan via DOM');
+            const id = getTweetId(url) || Date.now().toString();
+            
+            // Tunggu sebentar agar video sempat dimuat
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            showResult({
+                videos: domVideos,
+                user: 'protected',
+                id: id,
+                mode: 'dom'
+            });
+            return;
+        }
+
+        // PRIORITAS 2: Coba API (untuk akun publik)
+        console.log('🔄 Video tidak ditemukan di DOM, mencoba API...');
+        showLoading('Mencoba API...');
+        
         try {
-            const data = await fetchVideo(url);
+            const data = await fetchVideoAPI(url);
             showResult(data);
         } catch (e) {
+            console.error('❌ Semua metode gagal:', e);
             showError(e);
         }
     }
@@ -590,7 +807,7 @@
 
         const fab = document.createElement('button');
         fab.className = 'xvd-fab';
-        fab.textContent = '📥';
+        fab.textContent = '🔥';
         fab.onclick = () => {
             const url = findTweetUrl();
             if (url) {
@@ -615,7 +832,7 @@
 
             const btn = document.createElement('button');
             btn.className = 'xvd-vbtn';
-            btn.textContent = '📥';
+            btn.textContent = '🔥';
             btn.onclick = (e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -642,7 +859,8 @@
 
     // ========== INIT ==========
     function init() {
-        console.log('📥 X Video Downloader v5 - Firefox Android Edition');
+        console.log('🔥 X Video Downloader v6 - DOM MODE (Support Akun Terkunci)');
+        console.log('📋 Fitur: DOM Direct Access + API Fallback');
         createFab();
         addVideoButtons();
         obs.observe(document.body, { childList: true, subtree: true });

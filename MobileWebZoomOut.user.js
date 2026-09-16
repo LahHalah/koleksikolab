@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Mobile Desktop Zoom Control (Low Opacity Handle)
+// @name         Mobile Web ZoomOut
 // @namespace    http://tampermonkey.net/
-// @version      7.1
-// @description  Atur zoom per situs dengan tombol handle Z transparan (25%).
+// @version      8.0
+// @description  Atur zoom per situs dengan floating UI yang tahan terhadap Google/YouTube SPA
 // @author       Qwen & Assistant
 // @match        *://*/*
 // @grant        GM_setValue
@@ -10,25 +10,40 @@
 // @run-at       document-start
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     if (window.top !== window.self) return;
 
     const siteKey = 'zoom_' + window.location.hostname;
     let savedZoom = parseInt(GM_getValue(siteKey, 100), 10);
-    
-    applyViewport(savedZoom);
-    observeViewport();
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', injectUI);
-    } else {
-        injectUI();
+    if (!Number.isFinite(savedZoom)) {
+        savedZoom = 100;
     }
 
-    function applyViewport(zoomPercent) {
+    const PRESETS = [100, 90, 80, 70, 60, 50];
+
+    let uiHost = null;
+    let shadowRoot = null;
+    let panel = null;
+    let handle = null;
+
+    // =========================================================
+    // VIEWPORT
+    // =========================================================
+
+    function getTargetWidth(zoomPercent) {
+        const scale = zoomPercent / 100;
+        const screenWidth = window.screen.width || 360;
+        return Math.round(screenWidth / scale);
+    }
+
+    function setViewportMeta(zoomPercent) {
+        if (!document.head) return false;
+
         let meta = document.querySelector('meta[name="viewport"]');
+
         if (!meta) {
             meta = document.createElement('meta');
             meta.name = 'viewport';
@@ -36,174 +51,407 @@
         }
 
         if (zoomPercent === 100) {
-            meta.setAttribute('content', 'width=device-width, initial-scale=1.0');
+            meta.setAttribute(
+                'content',
+                'width=device-width, initial-scale=1.0'
+            );
         } else {
             const scale = zoomPercent / 100;
-            const screenWidth = window.screen.width || 360;
-            const targetWidth = Math.round(screenWidth / scale);
-            meta.setAttribute('content', `width=${targetWidth}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=3.0, user-scalable=yes`);
+            const targetWidth = getTargetWidth(zoomPercent);
+
+            meta.setAttribute(
+                'content',
+                `width=${targetWidth}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=3.0, user-scalable=yes`
+            );
         }
-        
-        updateUIScale(zoomPercent);
-        window.dispatchEvent(new Event('resize'));
+
+        return true;
     }
 
-    function updateUIScale(zoomPercent) {
-        const wrapper = document.getElementById('zoom-ui-wrapper');
-        if (!wrapper) return;
+    function applyViewport(zoomPercent) {
+        if (!setViewportMeta(zoomPercent)) {
+            waitForHead(() => applyViewport(zoomPercent));
+            return;
+        }
 
-        const scale = zoomPercent / 100;
-        const inverseScale = 1 / scale;
-        
-        wrapper.style.transformOrigin = 'right center';
-        wrapper.style.transform = `translateY(-50%) scale(${inverseScale})`;
+        updateUIScale();
+
+        try {
+            window.dispatchEvent(new Event('resize'));
+        } catch (_) {}
     }
 
-    function observeViewport() {
+    function waitForHead(callback) {
+        if (document.head) {
+            callback();
+            return;
+        }
+
         const observer = new MutationObserver(() => {
-            if (savedZoom !== 100) {
-                const scale = savedZoom / 100;
-                const targetWidth = Math.round((window.screen.width || 360) / scale);
-                const meta = document.querySelector('meta[name="viewport"]');
-                if (meta && !meta.getAttribute('content').includes(`width=${targetWidth}`)) {
-                    meta.setAttribute('content', `width=${targetWidth}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=3.0, user-scalable=yes`);
-                }
+            if (document.head) {
+                observer.disconnect();
+                callback();
             }
-            updateUIScale(savedZoom);
         });
-        observer.observe(document.head || document.documentElement, { childList: true, subtree: true, attributes: true });
+
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+
+        setTimeout(() => {
+            observer.disconnect();
+
+            if (document.head) {
+                callback();
+            }
+        }, 5000);
     }
 
-    function injectUI() {
-        if (document.getElementById('zoom-ui-wrapper')) return;
+    // =========================================================
+    // FLOATING UI
+    // =========================================================
+
+    function createUI() {
+        if (!document.documentElement) return;
+
+        // Sudah ada
+        if (uiHost && document.documentElement.contains(uiHost)) {
+            return;
+        }
+
+        // Bersihkan sisa lama
+        const old = document.getElementById('zoom-ui-host');
+        if (old) old.remove();
+
+        uiHost = document.createElement('div');
+        uiHost.id = 'zoom-ui-host';
+
+        // Paksa host tetap fixed dan tidak terpengaruh CSS situs
+        uiHost.setAttribute(
+            'style',
+            [
+                'all: initial !important',
+                'position: fixed !important',
+                'right: 0 !important',
+                'top: 50% !important',
+                'width: auto !important',
+                'height: auto !important',
+                'margin: 0 !important',
+                'padding: 0 !important',
+                'border: 0 !important',
+                'outline: 0 !important',
+                'background: transparent !important',
+                'z-index: 2147483647 !important',
+                'display: block !important',
+                'visibility: visible !important',
+                'opacity: 1 !important',
+                'pointer-events: none !important',
+                'transform: translateY(-50%) !important',
+                'font-size: 16px !important',
+                'line-height: normal !important'
+            ].join(';')
+        );
+
+        shadowRoot = uiHost.attachShadow({ mode: 'open' });
 
         const style = document.createElement('style');
+
         style.textContent = `
-            #zoom-ui-wrapper {
-                position: fixed;
-                right: 0;
-                top: 50%;
-                z-index: 2147483647;
+            :host,
+            * {
+                box-sizing: border-box;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .wrapper {
                 display: flex;
                 align-items: center;
+                justify-content: flex-end;
+                font-family: Arial, Helvetica, sans-serif;
                 pointer-events: none;
+                transform-origin: right center;
             }
-            #zoom-handle {
-                width: 28px;
-                height: 38px;
-                background: rgba(30, 30, 30, 0.9);
-                border-radius: 6px 0 0 6px;
-                color: #fff;
+
+            .handle {
+                width: 18px;
+                height: 34px;
+                background: rgba(30, 30, 30, 0.92);
+                border-radius: 7px 0 0 7px;
+                color: white;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 13px;
-                font-weight: bold;
-                cursor: pointer;
-                border: 1px solid rgba(255,255,255,0.2);
-                border-right: none;
-                pointer-events: auto;
-                box-shadow: -2px 0 6px rgba(0,0,0,0.3);
-                /* OPASITAS 25% */
-                opacity: 0.25;
-                transition: opacity 0.2s ease;
-            }
-            #zoom-handle:active {
-                opacity: 1.0;
-            }
-            #zoom-panel {
-                display: none;
-                background: rgba(255, 255, 255, 0.98);
-                padding: 10px;
-                border-radius: 10px 0 0 10px;
-                border: 1px solid rgba(0, 0, 0, 0.15);
-                pointer-events: auto;
-                width: 130px;
-                backdrop-filter: blur(10px);
-                box-shadow: -4px 0 12px rgba(0,0,0,0.15);
-            }
-            #zoom-panel.open { display: block; }
-            .zoom-title {
                 font-size: 11px;
-                font-weight: bold;
+                font-weight: 700;
+                cursor: pointer;
+                user-select: none;
+                -webkit-user-select: none;
+                border: 1px solid rgba(255,255,255,0.25);
+                border-right: none;
+                box-shadow: -2px 0 7px rgba(0,0,0,0.3);
+                pointer-events: auto;
+                opacity: 0.18;
+                transition: opacity .18s ease;
+                touch-action: manipulation;
+            }
+
+            .handle:active,
+            .handle.open {
+                opacity: 1;
+            }
+
+            .panel {
+                display: none;
+                width: 132px;
+                padding: 10px;
+                background: rgba(255,255,255,0.98);
+                border: 1px solid rgba(0,0,0,0.15);
+                border-right: none;
+                border-radius: 10px 0 0 10px;
+                box-shadow: -4px 0 14px rgba(0,0,0,0.18);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                pointer-events: auto;
+            }
+
+            .panel.open {
+                display: block;
+            }
+
+            .title {
+                font-size: 11px;
+                font-weight: 700;
                 color: #555;
                 text-align: center;
-                margin-bottom: 6px;
+                margin-bottom: 7px;
                 text-transform: uppercase;
-                letter-spacing: 0.5px;
+                letter-spacing: .5px;
             }
-            .zoom-grid {
+
+            .grid {
                 display: grid;
                 grid-template-columns: 1fr 1fr;
                 gap: 5px;
             }
-            .zoom-btn {
-                background: #f0f0f0;
-                border: 1px solid #ddd;
-                color: #333;
-                padding: 6px 0;
+
+            button {
+                appearance: none;
+                -webkit-appearance: none;
+                width: 100%;
+                min-height: 30px;
+                margin: 0;
+                padding: 5px 0;
                 border-radius: 5px;
+                border: 1px solid #ddd;
+                background: #f0f0f0;
+                color: #333;
+                font-family: Arial, Helvetica, sans-serif;
                 font-size: 12px;
-                font-weight: bold;
-                cursor: pointer;
+                font-weight: 700;
+                line-height: 1;
                 text-align: center;
-                transition: background 0.15s, color 0.15s;
+                cursor: pointer;
+                touch-action: manipulation;
             }
-            .zoom-btn:active {
-                transform: scale(0.96);
+
+            button:active {
+                transform: scale(.96);
             }
-            .zoom-btn.active {
+
+            button.active {
                 background: #007aff;
                 border-color: #007aff;
                 color: #fff;
             }
         `;
-        document.head.appendChild(style);
+
+        shadowRoot.appendChild(style);
 
         const wrapper = document.createElement('div');
-        wrapper.id = 'zoom-ui-wrapper';
+        wrapper.className = 'wrapper';
 
-        const panel = document.createElement('div');
-        panel.id = 'zoom-panel';
-        
-        const presets = [100, 90, 80, 70, 60, 50];
-        let buttonsHTML = '';
-        presets.forEach(p => {
-            const activeClass = p === savedZoom ? 'active' : '';
-            buttonsHTML += `<button class="zoom-btn ${activeClass}" data-zoom="${p}">${p}%</button>`;
-        });
+        panel = document.createElement('div');
+        panel.className = 'panel';
 
-        panel.innerHTML = `
-            <div class="zoom-title">Pilih Zoom</div>
-            <div class="zoom-grid">${buttonsHTML}</div>
-        `;
+        const title = document.createElement('div');
+        title.className = 'title';
+        title.textContent = 'Pilih Zoom';
 
-        const handle = document.createElement('div');
-        handle.id = 'zoom-handle';
-        handle.innerText = 'Z';
+        const grid = document.createElement('div');
+        grid.className = 'grid';
 
-        handle.addEventListener('click', () => {
-            panel.classList.toggle('open');
-        });
+        PRESETS.forEach(value => {
+            const button = document.createElement('button');
 
-        panel.addEventListener('click', (e) => {
-            if (e.target.classList.contains('zoom-btn')) {
-                const val = parseInt(e.target.getAttribute('data-zoom'), 10);
-                
-                panel.querySelectorAll('.zoom-btn').forEach(btn => btn.classList.remove('active'));
-                e.target.classList.add('active');
+            button.textContent = `${value}%`;
+            button.dataset.zoom = String(value);
 
-                savedZoom = val;
-                applyViewport(val);
-                GM_setValue(siteKey, val);
+            if (value === savedZoom) {
+                button.classList.add('active');
             }
+
+            button.addEventListener('click', () => {
+                const newZoom = parseInt(button.dataset.zoom, 10);
+
+                if (!Number.isFinite(newZoom)) return;
+
+                savedZoom = newZoom;
+
+                GM_setValue(siteKey, newZoom);
+
+                panel.querySelectorAll('button').forEach(btn => {
+                    btn.classList.toggle(
+                        'active',
+                        parseInt(btn.dataset.zoom, 10) === newZoom
+                    );
+                });
+
+                applyViewport(newZoom);
+            });
+
+            grid.appendChild(button);
+        });
+
+        panel.appendChild(title);
+        panel.appendChild(grid);
+
+        handle = document.createElement('div');
+        handle.className = 'handle';
+        handle.textContent = 'Z';
+
+        handle.addEventListener('click', event => {
+            event.stopPropagation();
+
+            const open = panel.classList.toggle('open');
+            handle.classList.toggle('open', open);
         });
 
         wrapper.appendChild(panel);
         wrapper.appendChild(handle);
-        document.documentElement.appendChild(wrapper);
 
-        updateUIScale(savedZoom);
+        shadowRoot.appendChild(wrapper);
+        document.documentElement.appendChild(uiHost);
+
+        updateUIScale();
     }
+
+    function updateUIScale() {
+        if (!shadowRoot || !shadowRoot.querySelector('.wrapper')) {
+            return;
+        }
+
+        const wrapper = shadowRoot.querySelector('.wrapper');
+
+        // UI tetap berukuran normal walaupun viewport memakai scale
+        const scale = savedZoom / 100;
+        const inverseScale = 1 / scale;
+
+        wrapper.style.transform =
+            `scale(${inverseScale})`;
+
+        wrapper.style.transformOrigin =
+            'right center';
+    }
+
+    // =========================================================
+    // KEEP UI ALIVE
+    // =========================================================
+
+    function ensureUI() {
+        if (
+            !uiHost ||
+            !document.documentElement.contains(uiHost)
+        ) {
+            createUI();
+        }
+    }
+
+    const domObserver = new MutationObserver(() => {
+        ensureUI();
+    });
+
+    function startObserver() {
+        if (!document.documentElement) return;
+
+        domObserver.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    // =========================================================
+    // GOOGLE / YOUTUBE SPA SUPPORT
+    // =========================================================
+
+    function patchHistory() {
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function () {
+            const result = originalPushState.apply(this, arguments);
+
+            setTimeout(() => {
+                ensureUI();
+                applyViewport(savedZoom);
+            }, 100);
+
+            return result;
+        };
+
+        history.replaceState = function () {
+            const result = originalReplaceState.apply(this, arguments);
+
+            setTimeout(() => {
+                ensureUI();
+                applyViewport(savedZoom);
+            }, 100);
+
+            return result;
+        };
+
+        window.addEventListener('popstate', () => {
+            setTimeout(() => {
+                ensureUI();
+                applyViewport(savedZoom);
+            }, 100);
+        });
+    }
+
+    // =========================================================
+    // START
+    // =========================================================
+
+    function start() {
+        waitForHead(() => {
+            applyViewport(savedZoom);
+        });
+
+        createUI();
+        startObserver();
+        patchHistory();
+
+        // Fallback tambahan untuk halaman yang agresif mengubah DOM
+        setInterval(() => {
+            ensureUI();
+            updateUIScale();
+        }, 1500);
+    }
+
+    if (document.documentElement) {
+        start();
+    } else {
+        const bootObserver = new MutationObserver(() => {
+            if (document.documentElement) {
+                bootObserver.disconnect();
+                start();
+            }
+        });
+
+        bootObserver.observe(document, {
+            childList: true,
+            subtree: true
+        });
+    }
+
 })();
-                        

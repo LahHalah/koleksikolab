@@ -1,12 +1,11 @@
 // ==UserScript==
 // @name         Mobile Web ZoomOut
-// @namespace    http://tampermonkey.net/
-// @version      8.0
-// @description  Atur zoom per situs dengan floating UI yang tahan terhadap Google/YouTube SPA
-// @author       Qwen & Assistant
+// @namespace    MobileWebZoomOut
+// @version      20.0
+// @description  Mobile web zoom with persistent zoom per website/domain
 // @match        *://*/*
-// @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_setValue
 // @run-at       document-start
 // ==/UserScript==
 
@@ -15,407 +14,619 @@
 
     if (window.top !== window.self) return;
 
-    const siteKey = 'zoom_' + window.location.hostname;
-    let savedZoom = parseInt(GM_getValue(siteKey, 100), 10);
-
-    if (!Number.isFinite(savedZoom)) {
-        savedZoom = 100;
-    }
-
     const PRESETS = [100, 90, 80, 70, 60, 50];
 
-    let uiHost = null;
-    let shadowRoot = null;
-    let panel = null;
-    let handle = null;
+    const hostname = location.hostname
+        .toLowerCase()
+        .replace(/^www\./, '');
+
+    const GM_KEY = 'MobileWebZoomOut::' + hostname;
+    const LS_KEY = 'MobileWebZoomOut::' + hostname;
+    const COOKIE_KEY = 'MobileWebZoomOutZoom';
+
+    let savedZoom = loadZoom();
+
+    // =========================================================
+    // STORAGE
+    // =========================================================
+
+    function normalizeZoom(value) {
+        const zoom = parseInt(value, 10);
+        return PRESETS.includes(zoom) ? zoom : 100;
+    }
+
+    function readCookie() {
+        try {
+            const cookies = document.cookie.split(';');
+
+            for (const cookie of cookies) {
+                const parts = cookie.trim().split('=');
+
+                if (parts[0] === COOKIE_KEY) {
+                    return normalizeZoom(
+                        decodeURIComponent(
+                            parts.slice(1).join('=')
+                        )
+                    );
+                }
+            }
+        } catch {}
+
+        return null;
+    }
+
+    function writeCookie(zoom) {
+        try {
+            document.cookie =
+                COOKIE_KEY +
+                '=' +
+                encodeURIComponent(zoom) +
+                ';path=/;max-age=31536000;SameSite=Lax';
+        } catch {}
+    }
+
+    function readLocalStorage() {
+        try {
+            const value = localStorage.getItem(LS_KEY);
+
+            if (value !== null) {
+                return normalizeZoom(value);
+            }
+        } catch {}
+
+        return null;
+    }
+
+    function writeLocalStorage(zoom) {
+        try {
+            localStorage.setItem(
+                LS_KEY,
+                String(zoom)
+            );
+        } catch {}
+    }
+
+    function readGM() {
+        try {
+            const value = GM_getValue(
+                GM_KEY,
+                null
+            );
+
+            if (value !== null) {
+                return normalizeZoom(value);
+            }
+        } catch {}
+
+        return null;
+    }
+
+    function writeGM(zoom) {
+        try {
+            GM_setValue(
+                GM_KEY,
+                String(zoom)
+            );
+        } catch {}
+    }
+
+    function loadZoom() {
+        const gmZoom = readGM();
+
+        if (gmZoom !== null) {
+            return gmZoom;
+        }
+
+        const localZoom = readLocalStorage();
+
+        if (localZoom !== null) {
+            writeGM(localZoom);
+            return localZoom;
+        }
+
+        const cookieZoom = readCookie();
+
+        if (cookieZoom !== null) {
+            writeGM(cookieZoom);
+            writeLocalStorage(cookieZoom);
+            return cookieZoom;
+        }
+
+        return 100;
+    }
+
+    function saveZoom(zoom) {
+        zoom = normalizeZoom(zoom);
+
+        savedZoom = zoom;
+
+        writeGM(zoom);
+        writeLocalStorage(zoom);
+        writeCookie(zoom);
+
+        applyViewport();
+        updateUI();
+    }
 
     // =========================================================
     // VIEWPORT
     // =========================================================
 
-    function getTargetWidth(zoomPercent) {
-        const scale = zoomPercent / 100;
-        const screenWidth = window.screen.width || 360;
-        return Math.round(screenWidth / scale);
+    function getViewportContent(zoom) {
+
+        const scale =
+            (zoom / 100).toFixed(2);
+
+        return [
+            'width=device-width',
+            `initial-scale=${scale}`,
+            'minimum-scale=0.1',
+            'maximum-scale=5',
+            'user-scalable=yes'
+        ].join(',');
     }
 
-    function setViewportMeta(zoomPercent) {
-        if (!document.head) return false;
+    function getViewportMeta() {
 
-        let meta = document.querySelector('meta[name="viewport"]');
+        let meta =
+            document.querySelector(
+                'meta[name="viewport"]'
+            );
 
-        if (!meta) {
-            meta = document.createElement('meta');
+        if (!meta && document.head) {
+
+            meta =
+                document.createElement('meta');
+
             meta.name = 'viewport';
-            document.head.appendChild(meta);
-        }
 
-        if (zoomPercent === 100) {
-            meta.setAttribute(
-                'content',
-                'width=device-width, initial-scale=1.0'
-            );
-        } else {
-            const scale = zoomPercent / 100;
-            const targetWidth = getTargetWidth(zoomPercent);
-
-            meta.setAttribute(
-                'content',
-                `width=${targetWidth}, initial-scale=${scale}, minimum-scale=${scale}, maximum-scale=3.0, user-scalable=yes`
+            document.head.insertBefore(
+                meta,
+                document.head.firstChild
             );
         }
 
-        return true;
+        return meta;
     }
 
-    function applyViewport(zoomPercent) {
-        if (!setViewportMeta(zoomPercent)) {
-            waitForHead(() => applyViewport(zoomPercent));
-            return;
+    function applyViewport() {
+
+        const meta =
+            getViewportMeta();
+
+        if (!meta) return;
+
+        const target =
+            getViewportContent(
+                savedZoom
+            );
+
+        if (
+            meta.getAttribute('content') !==
+            target
+        ) {
+            meta.setAttribute(
+                'content',
+                target
+            );
         }
-
-        updateUIScale();
-
-        try {
-            window.dispatchEvent(new Event('resize'));
-        } catch (_) {}
     }
 
-    function waitForHead(callback) {
-        if (document.head) {
-            callback();
-            return;
-        }
-
-        const observer = new MutationObserver(() => {
-            if (document.head) {
-                observer.disconnect();
-                callback();
-            }
-        });
-
-        observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true
-        });
-
-        setTimeout(() => {
-            observer.disconnect();
-
-            if (document.head) {
-                callback();
-            }
-        }, 5000);
+    function applyInitialViewport() {
+        applyViewport();
     }
 
     // =========================================================
     // FLOATING UI
     // =========================================================
 
-    function createUI() {
-        if (!document.documentElement) return;
+    function getUI() {
+        return document.getElementById(
+            'mobile-web-zoomout-ui'
+        );
+    }
 
-        // Sudah ada
-        if (uiHost && document.documentElement.contains(uiHost)) {
+    function updateUIScale() {
+
+        const ui = getUI();
+
+        if (!ui) return;
+
+        const scale =
+            100 / savedZoom;
+
+        ui.style.transform =
+            `translateY(-50%) scale(${scale})`;
+    }
+
+    function updateUI() {
+
+        const ui = getUI();
+
+        if (!ui || !ui.shadowRoot) {
             return;
         }
 
-        // Bersihkan sisa lama
-        const old = document.getElementById('zoom-ui-host');
-        if (old) old.remove();
+        const buttons =
+            ui.shadowRoot.querySelectorAll(
+                '.zoom-option'
+            );
 
-        uiHost = document.createElement('div');
-        uiHost.id = 'zoom-ui-host';
+        buttons.forEach(button => {
 
-        // Paksa host tetap fixed dan tidak terpengaruh CSS situs
-        uiHost.setAttribute(
-            'style',
-            [
-                'all: initial !important',
-                'position: fixed !important',
-                'right: 0 !important',
-                'top: 50% !important',
-                'width: auto !important',
-                'height: auto !important',
-                'margin: 0 !important',
-                'padding: 0 !important',
-                'border: 0 !important',
-                'outline: 0 !important',
-                'background: transparent !important',
-                'z-index: 2147483647 !important',
-                'display: block !important',
-                'visibility: visible !important',
-                'opacity: 1 !important',
-                'pointer-events: none !important',
-                'transform: translateY(-50%) !important',
-                'font-size: 16px !important',
-                'line-height: normal !important'
-            ].join(';')
-        );
+            const value =
+                parseInt(
+                    button.dataset.zoom,
+                    10
+                );
 
-        shadowRoot = uiHost.attachShadow({ mode: 'open' });
+            button.classList.toggle(
+                'active',
+                value === savedZoom
+            );
+        });
 
-        const style = document.createElement('style');
+        updateUIScale();
+    }
+
+    function createUI() {
+
+        if (getUI()) {
+            updateUI();
+            return;
+        }
+
+        const ui =
+            document.createElement('div');
+
+        ui.id =
+            'mobile-web-zoomout-ui';
+
+        Object.assign(ui.style, {
+            position: 'fixed',
+            right: '0px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            transformOrigin: 'right center',
+            zIndex: '2147483647',
+            margin: '0',
+            padding: '0',
+            border: '0',
+            background: 'transparent',
+            boxShadow: 'none',
+            pointerEvents: 'auto'
+        });
+
+        const shadow =
+            ui.attachShadow({
+                mode: 'open'
+            });
+
+        const style =
+            document.createElement('style');
 
         style.textContent = `
-            :host,
+
             * {
                 box-sizing: border-box;
                 -webkit-tap-highlight-color: transparent;
             }
 
-            .wrapper {
+            .container {
                 display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                font-family: Arial, Helvetica, sans-serif;
-                pointer-events: none;
-                transform-origin: right center;
+                flex-direction: column;
+                align-items: flex-end;
+                margin: 0;
+                padding: 0;
             }
 
-            .handle {
-                width: 18px;
-                height: 34px;
-                background: rgba(30, 30, 30, 0.92);
-                border-radius: 7px 0 0 7px;
-                color: white;
+            .main {
+                width: 13px;
+                height: 32px;
+
+                margin: 0;
+                padding: 0;
+
+                border: 0;
+                border-left: 1px solid rgba(255,255,255,.30);
+
+                border-radius: 4px 0 0 4px;
+
+                background: rgba(0,0,0,.28);
+
+                color: rgba(255,255,255,.82);
+
+                font-family: Arial, sans-serif;
+                font-size: 8px;
+                font-weight: 700;
+
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                font-size: 11px;
-                font-weight: 700;
+
+                writing-mode: vertical-rl;
+
+                outline: none;
+                appearance: none;
+                -webkit-appearance: none;
+
+                box-shadow: none;
+
                 cursor: pointer;
-                user-select: none;
-                -webkit-user-select: none;
-                border: 1px solid rgba(255,255,255,0.25);
-                border-right: none;
-                box-shadow: -2px 0 7px rgba(0,0,0,0.3);
-                pointer-events: auto;
-                opacity: 0.18;
-                transition: opacity .18s ease;
-                touch-action: manipulation;
             }
 
-            .handle:active,
-            .handle.open {
-                opacity: 1;
+            .main:active {
+                background: rgba(0,0,0,.45);
             }
 
             .panel {
                 display: none;
-                width: 132px;
-                padding: 10px;
-                background: rgba(255,255,255,0.98);
-                border: 1px solid rgba(0,0,0,0.15);
-                border-right: none;
-                border-radius: 10px 0 0 10px;
-                box-shadow: -4px 0 14px rgba(0,0,0,0.18);
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                pointer-events: auto;
+
+                flex-direction: column;
+
+                width: 38px;
+
+                margin: 0;
+                padding: 2px;
+
+                border: 1px solid rgba(255,255,255,.18);
+
+                border-radius: 4px;
+
+                background: rgba(0,0,0,.78);
+
+                box-shadow: none;
             }
 
             .panel.open {
-                display: block;
+                display: flex;
             }
 
-            .title {
-                font-size: 11px;
-                font-weight: 700;
-                color: #555;
-                text-align: center;
-                margin-bottom: 7px;
-                text-transform: uppercase;
-                letter-spacing: .5px;
-            }
+            .zoom-option {
+                width: 100%;
+                height: 23px;
 
-            .grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 5px;
-            }
+                margin: 0;
+                padding: 0;
 
-            button {
+                border: 0;
+                border-radius: 3px;
+
+                background: transparent;
+
+                color: rgba(255,255,255,.82);
+
+                font-family: Arial, sans-serif;
+                font-size: 8px;
+                font-weight: 600;
+
+                outline: none;
                 appearance: none;
                 -webkit-appearance: none;
-                width: 100%;
-                min-height: 30px;
-                margin: 0;
-                padding: 5px 0;
-                border-radius: 5px;
-                border: 1px solid #ddd;
-                background: #f0f0f0;
-                color: #333;
-                font-family: Arial, Helvetica, sans-serif;
-                font-size: 12px;
-                font-weight: 700;
-                line-height: 1;
-                text-align: center;
-                cursor: pointer;
-                touch-action: manipulation;
             }
 
-            button:active {
-                transform: scale(.96);
-            }
-
-            button.active {
-                background: #007aff;
-                border-color: #007aff;
+            .zoom-option.active {
+                background: rgba(255,255,255,.18);
                 color: #fff;
+            }
+
+            .zoom-option:active {
+                background: rgba(255,255,255,.28);
             }
         `;
 
-        shadowRoot.appendChild(style);
+        const container =
+            document.createElement('div');
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'wrapper';
+        container.className =
+            'container';
 
-        panel = document.createElement('div');
-        panel.className = 'panel';
+        const panel =
+            document.createElement('div');
 
-        const title = document.createElement('div');
-        title.className = 'title';
-        title.textContent = 'Pilih Zoom';
+        panel.className =
+            'panel';
 
-        const grid = document.createElement('div');
-        grid.className = 'grid';
+        panel.id =
+            'zoom-panel';
 
-        PRESETS.forEach(value => {
-            const button = document.createElement('button');
+        PRESETS.forEach(zoom => {
 
-            button.textContent = `${value}%`;
-            button.dataset.zoom = String(value);
+            const button =
+                document.createElement('button');
 
-            if (value === savedZoom) {
-                button.classList.add('active');
-            }
+            button.className =
+                'zoom-option';
 
-            button.addEventListener('click', () => {
-                const newZoom = parseInt(button.dataset.zoom, 10);
+            button.dataset.zoom =
+                String(zoom);
 
-                if (!Number.isFinite(newZoom)) return;
+            button.textContent =
+                zoom + '%';
 
-                savedZoom = newZoom;
+            button.addEventListener(
+                'click',
+                event => {
 
-                GM_setValue(siteKey, newZoom);
+                    event.stopPropagation();
 
-                panel.querySelectorAll('button').forEach(btn => {
-                    btn.classList.toggle(
-                        'active',
-                        parseInt(btn.dataset.zoom, 10) === newZoom
+                    saveZoom(zoom);
+
+                    panel.classList.remove(
+                        'open'
                     );
-                });
+                }
+            );
 
-                applyViewport(newZoom);
-            });
-
-            grid.appendChild(button);
+            panel.appendChild(button);
         });
 
-        panel.appendChild(title);
-        panel.appendChild(grid);
+        const main =
+            document.createElement('button');
 
-        handle = document.createElement('div');
-        handle.className = 'handle';
-        handle.textContent = 'Z';
+        main.className =
+            'main';
 
-        handle.addEventListener('click', event => {
-            event.stopPropagation();
+        main.textContent =
+            'Z';
 
-            const open = panel.classList.toggle('open');
-            handle.classList.toggle('open', open);
-        });
+        main.addEventListener(
+            'click',
+            event => {
 
-        wrapper.appendChild(panel);
-        wrapper.appendChild(handle);
+                event.stopPropagation();
 
-        shadowRoot.appendChild(wrapper);
-        document.documentElement.appendChild(uiHost);
+                panel.classList.toggle(
+                    'open'
+                );
+            }
+        );
 
-        updateUIScale();
+        container.appendChild(panel);
+        container.appendChild(main);
+
+        shadow.appendChild(style);
+        shadow.appendChild(container);
+
+        document.documentElement.appendChild(ui);
+
+        updateUI();
     }
 
-    function updateUIScale() {
-        if (!shadowRoot || !shadowRoot.querySelector('.wrapper')) {
+    function ensureUI() {
+
+        if (!document.documentElement) {
             return;
         }
 
-        const wrapper = shadowRoot.querySelector('.wrapper');
-
-        // UI tetap berukuran normal walaupun viewport memakai scale
-        const scale = savedZoom / 100;
-        const inverseScale = 1 / scale;
-
-        wrapper.style.transform =
-            `scale(${inverseScale})`;
-
-        wrapper.style.transformOrigin =
-            'right center';
-    }
-
-    // =========================================================
-    // KEEP UI ALIVE
-    // =========================================================
-
-    function ensureUI() {
-        if (
-            !uiHost ||
-            !document.documentElement.contains(uiHost)
-        ) {
+        if (!getUI()) {
             createUI();
+        } else {
+            updateUI();
         }
     }
 
-    const domObserver = new MutationObserver(() => {
-        ensureUI();
-    });
+    // =========================================================
+    // PROTECT VIEWPORT
+    // =========================================================
 
-    function startObserver() {
-        if (!document.documentElement) return;
+    function protectViewport() {
 
-        domObserver.observe(document.documentElement, {
-            childList: true,
-            subtree: true
-        });
+        if (!document.head) return;
+
+        const observer =
+            new MutationObserver(() => {
+
+                const meta =
+                    document.querySelector(
+                        'meta[name="viewport"]'
+                    );
+
+                if (!meta) {
+                    applyViewport();
+                    return;
+                }
+
+                const expected =
+                    getViewportContent(
+                        savedZoom
+                    );
+
+                if (
+                    meta.getAttribute(
+                        'content'
+                    ) !== expected
+                ) {
+
+                    meta.setAttribute(
+                        'content',
+                        expected
+                    );
+                }
+            });
+
+        observer.observe(
+            document.head,
+            {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: [
+                    'content'
+                ]
+            }
+        );
     }
 
     // =========================================================
-    // GOOGLE / YOUTUBE SPA SUPPORT
+    // NAVIGATION
     // =========================================================
 
-    function patchHistory() {
-        const originalPushState = history.pushState;
-        const originalReplaceState = history.replaceState;
+    function setupNavigationWatcher() {
 
-        history.pushState = function () {
-            const result = originalPushState.apply(this, arguments);
+        const originalPushState =
+            history.pushState;
 
-            setTimeout(() => {
-                ensureUI();
-                applyViewport(savedZoom);
-            }, 100);
+        const originalReplaceState =
+            history.replaceState;
 
-            return result;
-        };
-
-        history.replaceState = function () {
-            const result = originalReplaceState.apply(this, arguments);
+        function afterNavigation() {
 
             setTimeout(() => {
-                ensureUI();
-                applyViewport(savedZoom);
-            }, 100);
 
-            return result;
-        };
+                savedZoom =
+                    loadZoom();
 
-        window.addEventListener('popstate', () => {
-            setTimeout(() => {
+                applyViewport();
                 ensureUI();
-                applyViewport(savedZoom);
-            }, 100);
-        });
+
+            }, 50);
+        }
+
+        history.pushState =
+            function () {
+
+                const result =
+                    originalPushState.apply(
+                        this,
+                        arguments
+                    );
+
+                afterNavigation();
+
+                return result;
+            };
+
+        history.replaceState =
+            function () {
+
+                const result =
+                    originalReplaceState.apply(
+                        this,
+                        arguments
+                    );
+
+                afterNavigation();
+
+                return result;
+            };
+
+        window.addEventListener(
+            'popstate',
+            afterNavigation
+        );
+
+        window.addEventListener(
+            'pageshow',
+            () => {
+
+                savedZoom =
+                    loadZoom();
+
+                applyViewport();
+                ensureUI();
+            }
+        );
     }
 
     // =========================================================
@@ -423,35 +634,59 @@
     // =========================================================
 
     function start() {
-        waitForHead(() => {
-            applyViewport(savedZoom);
-        });
 
-        createUI();
-        startObserver();
-        patchHistory();
+        applyInitialViewport();
 
-        // Fallback tambahan untuk halaman yang agresif mengubah DOM
-        setInterval(() => {
-            ensureUI();
-            updateUIScale();
-        }, 1500);
+        if (document.documentElement) {
+            createUI();
+        }
+
+        if (document.head) {
+            protectViewport();
+        }
+
+        setupNavigationWatcher();
+
+        if (!document.documentElement) {
+
+            const observer =
+                new MutationObserver(() => {
+
+                    if (
+                        document.documentElement
+                    ) {
+
+                        applyInitialViewport();
+                        createUI();
+
+                        observer.disconnect();
+                    }
+                });
+
+            observer.observe(
+                document,
+                {
+                    childList: true,
+                    subtree: true
+                }
+            );
+        }
+
+        window.addEventListener(
+            'load',
+            () => {
+
+                savedZoom =
+                    loadZoom();
+
+                applyViewport();
+                ensureUI();
+
+            },
+            { once: true }
+        );
     }
 
-    if (document.documentElement) {
-        start();
-    } else {
-        const bootObserver = new MutationObserver(() => {
-            if (document.documentElement) {
-                bootObserver.disconnect();
-                start();
-            }
-        });
-
-        bootObserver.observe(document, {
-            childList: true,
-            subtree: true
-        });
-    }
+    start();
 
 })();

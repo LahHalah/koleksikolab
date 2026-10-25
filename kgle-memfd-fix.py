@@ -25,13 +25,12 @@ def create_anonymous_file_safe(size=0):
     if os.name == "nt":
         return _original(size)
 
-    # Linux / Kaggle fallback
     if hasattr(os, "memfd_create"):
         file = open("aimdo", "w+b", buffering=0,
                     opener=lambda name, mode: os.memfd_create(name, os.MFD_CLOEXEC))
     else:
-        path = os.path.join(tempfile.gettempdir(), f"aimdo-{uuid.uuid4().hex}")
-        file = open(path, "w+b", buffering=0)
+        # Pakai NamedTemporaryFile supaya otomatis dihapus saat close
+        file = tempfile.NamedTemporaryFile(prefix="aimdo-", suffix=".tmp", delete=True, mode="w+b", buffering=0)
 
     try:
         file.truncate(size)
@@ -40,9 +39,8 @@ def create_anonymous_file_safe(size=0):
         file.close()
         raise
 
-# Override fungsi asli
 af.create_anonymous_file = create_anonymous_file_safe
-print("[fix_memfd] Patched create_anonymous_file — memfd_create fallback aktif")
+print("[fix_memfd] Patched create_anonymous_file (auto-delete temp file)")
 '''
 
 # Tulis file
